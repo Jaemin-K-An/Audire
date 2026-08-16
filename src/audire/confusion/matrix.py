@@ -78,12 +78,53 @@ class SmoothingSpec:
         return np.full(shape, 1.0 / shape[1], dtype=np.float64)
 
     def describe(self) -> dict[str, Any]:
-        """JSON-safe description for provenance records."""
+        """Compact, human-readable description for provenance records.
+
+        Deliberately **lossy**: it omits the prior matrix. Use :meth:`to_dict` whenever
+        the specification has to survive a round trip.
+        """
         return {
             "alpha": self.alpha,
             "kind": self.kind,
             "has_explicit_prior": self.prior is not None,
         }
+
+    def to_dict(self) -> dict[str, Any]:
+        """Lossless JSON-safe representation, including any explicit prior.
+
+        An explicit prior changes every probability the matrix reports, so dropping it on
+        save would make a reloaded matrix silently disagree with the one that produced the
+        recorded results.
+        """
+        payload: dict[str, Any] = {"alpha": self.alpha, "kind": self.kind}
+        if self.prior is not None:
+            payload["prior"] = self.prior.tolist()
+        return payload
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> Self:
+        """Rebuild a specification, reconstructing an explicit prior when present.
+
+        Raises
+        ------
+        ValueError
+            If ``kind`` is unknown, or if the stored prior is missing or malformed.
+            Falling back to a uniform prior would be the dangerous behaviour: it produces
+            a usable-looking matrix that reports different probabilities.
+        """
+        kind = payload.get("kind", "uniform")
+        if kind not in ("uniform", "explicit"):
+            raise ValueError(f"unknown smoothing kind {kind!r}; expected 'uniform' or 'explicit'")
+        alpha = float(payload.get("alpha", DEFAULT_ALPHA))
+        raw_prior = payload.get("prior")
+        if kind == "explicit" and raw_prior is None:
+            raise ValueError(
+                "stored smoothing declares kind='explicit' but carries no prior matrix; "
+                "refusing to substitute a uniform prior because that would silently "
+                "change every probability this matrix reports"
+            )
+        prior = None if raw_prior is None else np.asarray(raw_prior, dtype=np.float64)
+        return cls(alpha=alpha, kind=kind, prior=prior)
 
 
 @dataclass(slots=True)
@@ -277,7 +318,12 @@ class ConfusionMatrix:
     # ---------------------------------------------------------------- serialisation
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-safe representation preserving raw counts."""
+        """JSON-safe representation preserving raw counts and the full smoothing spec.
+
+        The category labels are stored so that a reader can verify the counts are being
+        interpreted under the same inventory that produced them; :meth:`from_dict`
+        enforces that check.
+        """
         return {
             "position": self.position.value,
             "target_labels": list(self.target_labels),
@@ -285,19 +331,70 @@ class ConfusionMatrix:
             "counts": self.counts.tolist(),
             "row_counts": self.row_counts().tolist(),
             "total_observations": self.total_observations,
-            "smoothing": self.smoothing.describe(),
+            "smoothing": self.smoothing.to_dict(),
         }
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any], smoothing: SmoothingSpec | None = None) -> Self:
+        """Rebuild a matrix, validating that the stored labels still mean what they meant.
+
+        Parameters
+        ----------
+        smoothing:
+            Explicit override. When omitted the stored specification is reconstructed
+            **including any explicit prior** — never silently downgraded to uniform.
+
+        Raises
+        ------
+        ValueError
+            If the stored labels are absent, unknown, or in a different order from the
+            current inventory. Reinterpreting old counts under a changed inventory is the
+            most dangerous possible failure here: the matrix would still look valid while
+            attributing every observation to the wrong phoneme.
+        """
         position = Position(payload["position"])
+        _validate_labels(position, payload)
         counts = np.asarray(payload["counts"], dtype=np.int64)
         spec = smoothing
         if spec is None:
-            raw = payload.get("smoothing") or {}
-            spec = SmoothingSpec(alpha=float(raw.get("alpha", DEFAULT_ALPHA)), kind="uniform")
+            spec = SmoothingSpec.from_dict(payload.get("smoothing") or {})
         return cls(position=position, counts=counts, smoothing=spec)
 
     def save_json(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(self.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _validate_labels(position: Position, payload: dict[str, Any]) -> None:
+    """Check stored category labels against the inventory in force right now.
+
+    Order matters as much as membership: the counts array is indexed positionally, so a
+    reordered alphabet silently reassigns every observation to a different phoneme.
+    """
+    axes: tuple[tuple[Literal["target", "perceived"], str], ...] = (
+        ("target", "target_labels"),
+        ("perceived", "perceived_labels"),
+    )
+    for axis, key in axes:
+        stored = payload.get(key)
+        if stored is None:
+            raise ValueError(
+                f"stored {position.value} matrix has no {key!r}; the counts cannot be "
+                f"interpreted without knowing which 라벨(label) each index meant"
+            )
+        expected = list(categories_for(position, axis=axis))
+        if list(stored) == expected:
+            continue
+        if set(stored) != set(expected):
+            unknown = sorted(set(stored) - set(expected))
+            missing = sorted(set(expected) - set(stored))
+            raise ValueError(
+                f"{position.value} {key} do not match the current inventory: "
+                f"unknown 라벨(label)={unknown} missing={missing}. Refusing to "
+                f"reinterpret the counts under a different alphabet."
+            )
+        raise ValueError(
+            f"{position.value} {key} are in a different 순서(order) from the current "
+            f"inventory. The counts array is indexed positionally, so loading them would "
+            f"assign every observation to the wrong category."
+        )
