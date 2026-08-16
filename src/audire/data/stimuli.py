@@ -40,6 +40,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from audire.config.paths import raw_dir
+from audire.data.manifest import require_verified
 from audire.data.sources import Source, registry
 from audire.hangul.inventory import NO_CODA, NUCLEUS_JAMO, ONSET_JAMO
 from audire.hangul.syllable import Syllable, compose_syllable, decompose_syllable
@@ -222,6 +223,10 @@ def load_kmsp_catalog(root: Path | None = None, source: Source | None = None) ->
     """
     src = source or registry().get("korean_monosyllabic_speech")
     src.require_acknowledgement()
+    if root is None:
+        # Verify the manifest at consumption time. Skipped only when the caller supplies
+        # an explicit root, which is the test/inspection path rather than a research run.
+        require_verified(src.id)
     base = (root or kmsp_root()).resolve()
     meta_name = str(src.expected.get("metadata_file", "metadata.csv"))
     meta = base / meta_name

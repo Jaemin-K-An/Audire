@@ -23,6 +23,66 @@ _SKIP_DIRS = frozenset({".git", ".cache", "__pycache__", ".huggingface"})
 MANIFEST_SCHEMA_VERSION = 1
 
 
+class DataIntegrityError(RuntimeError):
+    """Raised when local data no longer matches the manifest recorded for it.
+
+    This is deliberately fatal. The alternative — proceeding with bytes that differ from
+    the ones the manifest describes — produces results whose stated provenance is false,
+    which is worse than no result at all.
+    """
+
+
+#: Source ids whose manifests were verified in this process. Populated by
+#: :func:`require_verified` so that an experiment records only the datasets it actually
+#: consumed, rather than every manifest that happens to sit on disk.
+_ACCESSED: set[str] = set()
+
+
+def accessed_sources() -> frozenset[str]:
+    """Registered sources verified since the last :func:`reset_accessed`."""
+    return frozenset(_ACCESSED)
+
+
+def reset_accessed() -> None:
+    """Clear the accessed set. Called at the start of each tracked run."""
+    _ACCESSED.clear()
+
+
+def require_verified(source_id: str, *, deep: bool = True) -> Manifest:
+    """Load a source's manifest, verify the local bytes, and record the access.
+
+    Verification happens **at consumption time**, not only at fetch time. A manifest
+    written when the data was downloaded says nothing about whether the file on disk is
+    still that data; only re-checking at the moment of use can rule out
+
+        manifest digest = bytes A,  model input = bytes B.
+
+    ``deep=True`` (the default) re-hashes every file. Research runs must use it: a size
+    check cannot detect an edit that preserves length. ``deep=False`` exists for cheap
+    liveness checks and is an explicit choice, never the default.
+
+    Raises
+    ------
+    FileNotFoundError
+        If no manifest exists for ``source_id``.
+    DataIntegrityError
+        If the local files no longer match the manifest.
+    """
+    manifest = Manifest.load(source_id)
+    problems = manifest.verify(deep=deep)
+    if problems:
+        shown = "; ".join(problems[:5])
+        more = f" (+{len(problems) - 5} more)" if len(problems) > 5 else ""
+        raise DataIntegrityError(
+            f"데이터 무결성(integrity) 실패: source {source_id!r} 의 로컬 파일이 "
+            f"매니페스트와 다릅니다 — {shown}{more}. "
+            f"실험을 계속하면 보고되는 출처가 거짓이 됩니다. "
+            f"`python scripts/fetch_data.py {source_id} --force` 로 다시 취득하십시오."
+        )
+    _ACCESSED.add(source_id)
+    return manifest
+
+
 def sha256_file(path: Path, *, chunk_size: int = 1 << 20) -> str:
     """Stream a SHA-256 digest of ``path``."""
     h = hashlib.sha256()

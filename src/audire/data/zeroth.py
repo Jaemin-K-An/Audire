@@ -15,6 +15,7 @@ import numpy as np
 import numpy.typing as npt
 
 from audire.data.fetch import local_path_for
+from audire.data.manifest import require_verified
 from audire.data.sources import registry
 
 FloatArray = npt.NDArray[np.float32]
@@ -31,8 +32,15 @@ class ZerothUtterance:
     audio: FloatArray | None = None
 
 
-def _parquet_path() -> Path:
+def _parquet_path(*, verify: bool = True) -> Path:
+    """Locate the pinned shard, verifying its manifest before it is read.
+
+    Verification happens here rather than only at fetch time so that a file edited after
+    download cannot silently become model input (P0.2).
+    """
     src = registry().get("zeroth_korean_test")
+    if verify:
+        require_verified(src.id)
     rel = str(src.expected.get("parquet_file", "data/test-00000-of-00001.parquet"))
     path = local_path_for(src) / rel
     if not path.exists():

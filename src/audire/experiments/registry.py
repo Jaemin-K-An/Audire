@@ -14,7 +14,7 @@ import platform
 import subprocess
 import sys
 import traceback
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -24,37 +24,37 @@ from typing import Any
 import yaml
 
 from audire.config.paths import artifacts_dir, experiments_dir, manifests_dir, repo_root
+from audire.data.manifest import accessed_sources, reset_accessed
 
 REGISTRY_SCHEMA_VERSION = 1
 
 
-def git_sha(short: bool = False) -> str:
-    """Current commit SHA, or ``"unknown"`` outside a repository."""
-    try:
-        args = ["git", "rev-parse"] + (["--short"] if short else []) + ["HEAD"]
-        out = subprocess.run(args, cwd=repo_root(), capture_output=True, text=True, check=True)
-        return out.stdout.strip()
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return "unknown"
-
-
-def git_is_dirty() -> bool:
-    """Whether the working tree has uncommitted changes.
-
-    Recorded per run: a result produced from a dirty tree is not reproducible from its
-    SHA alone, and saying so is better than pretending otherwise.
-    """
+def _git(*args: str) -> str | None:
+    """Run a git command, returning ``None`` when git state cannot be determined."""
     try:
         out = subprocess.run(
-            ["git", "status", "--porcelain"],
-            cwd=repo_root(),
-            capture_output=True,
-            text=True,
-            check=True,
+            ["git", *args], cwd=repo_root(), capture_output=True, text=True, check=True
         )
-        return bool(out.stdout.strip())
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return False
+        return out.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        return None
+
+
+def git_sha(short: bool = False) -> str:
+    """Current commit SHA, or ``"unknown"`` when git state cannot be determined."""
+    out = _git("rev-parse", *(["--short"] if short else []), "HEAD")
+    return out if out else "unknown"
+
+
+def git_is_dirty() -> bool | str:
+    """Whether the working tree has uncommitted changes, or ``"unknown"``.
+
+    Returns the string ``"unknown"`` rather than ``False`` when git cannot be queried.
+    Recording a clean tree we never verified would be a false provenance claim, and a
+    result produced from a dirty tree is not reproducible from its SHA alone.
+    """
+    out = _git("status", "--porcelain")
+    return "unknown" if out is None else bool(out)
 
 
 def lock_hash() -> str:
@@ -65,13 +65,92 @@ def lock_hash() -> str:
     return hashlib.sha256(lock.read_bytes()).hexdigest()[:16]
 
 
-def data_manifest_ids() -> dict[str, str]:
-    """Content digests of every data manifest currently on disk."""
+def _installed_distributions() -> dict[str, str]:
+    """Name -> version for every distribution actually importable right now."""
+    import importlib.metadata as md
+
+    out: dict[str, str] = {}
+    for dist in md.distributions():
+        name = dist.metadata["Name"]
+        if name:
+            out[name.lower().replace("_", "-")] = dist.version or "unknown"
+    return out
+
+
+def environment_fingerprint() -> dict[str, Any]:
+    """Fingerprint the environment that is **actually installed**, not a declared file.
+
+    Hashing ``requirements.lock`` alone proves nothing: the file may bear no relation to
+    the interpreter running the experiment. This reads the live distribution metadata, so
+    the recorded digest changes whenever the environment a result was produced in changes.
+    """
+    dists = _installed_distributions()
+    h = hashlib.sha256()
+    h.update(sys.version.encode("utf-8"))
+    h.update(b"\0")
+    for name in sorted(dists):
+        h.update(f"{name}=={dists[name]}\n".encode())
+    return {
+        "digest": h.hexdigest(),
+        "python": sys.version.split()[0],
+        "n_distributions": len(dists),
+        "distributions": dists,
+    }
+
+
+def environment_matches_lock() -> dict[str, Any]:
+    """Compare the declared lockfile against the installed environment.
+
+    Reports ``match`` / ``mismatch`` / ``no_lockfile`` / ``unknown`` plus the specific
+    differences, so a run recorded against a lockfile it did not actually use is visible
+    instead of implied.
+    """
+    lock = repo_root() / "requirements.lock"
+    if not lock.exists():
+        return {"status": "no_lockfile", "differences": []}
+    try:
+        text = lock.read_text(encoding="utf-8")
+    except OSError:  # pragma: no cover - unreadable lockfile
+        return {"status": "unknown", "differences": []}
+
+    declared: dict[str, str] = {}
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "==" not in line:
+            continue
+        name, _, version = line.partition("==")
+        declared[name.strip().lower().replace("_", "-")] = version.strip().split(" ")[0]
+
+    installed = _installed_distributions()
+    differences = [
+        {"package": name, "declared": version, "installed": installed.get(name, "MISSING")}
+        for name, version in sorted(declared.items())
+        if installed.get(name) != version
+    ]
+    return {
+        "status": "match" if not differences else "mismatch",
+        "n_declared": len(declared),
+        "n_differences": len(differences),
+        # Truncated: a wholesale mismatch should not bloat every registry entry.
+        "differences": differences[:20],
+    }
+
+
+def data_manifest_ids(only: Iterable[str] | None = None) -> dict[str, str]:
+    """Content digests of data manifests.
+
+    ``only`` restricts the result to sources an experiment actually consumed. Recording
+    every manifest that happens to sit on disk would attribute datasets to a run that
+    never read them.
+    """
     out: dict[str, str] = {}
     d = manifests_dir()
     if not d.exists():
         return out
+    wanted = None if only is None else set(only)
     for path in sorted(d.glob("*.json")):
+        if wanted is not None and path.stem not in wanted:
+            continue
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):  # pragma: no cover - corrupt manifest
@@ -88,8 +167,12 @@ class RunRecord:
     experiment: str
     started_at_utc: str
     git_sha: str
-    git_dirty: bool
+    git_dirty: bool | str
     lock_hash: str
+    #: Digest of the environment that is actually installed (P0.3).
+    env_fingerprint: str
+    #: Whether the declared lockfile matches that environment.
+    env_matches_lock: str
     python: str
     platform: str
     seeds: list[int]
@@ -122,11 +205,14 @@ def new_run(
         git_sha=git_sha(),
         git_dirty=git_is_dirty(),
         lock_hash=lock_hash(),
+        env_fingerprint=environment_fingerprint()["digest"],
+        env_matches_lock=str(environment_matches_lock()["status"]),
         python=sys.version.split()[0],
         platform=f"{platform.system()} {platform.machine()}",
         seeds=list(seeds),
         config=config,
-        data_manifests=data_manifest_ids(),
+        # Filled in when the run ends, from the sources it actually consumed.
+        data_manifests={},
         notes=notes,
     )
 
@@ -231,11 +317,13 @@ def tracked_run(
     because a long sweep is routinely interrupted — the record is marked ``failed`` with
     the error and its traceback, and the exception is re-raised unchanged.
     """
+    reset_accessed()
     record = new_run(experiment, config, seeds, notes=notes)
     append_run(record)  # visible as `running` from this moment on
     try:
         yield record
     except BaseException as exc:
+        record.data_manifests = data_manifest_ids(only=accessed_sources())
         fail_run(
             record,
             f"{type(exc).__name__}: {exc}",
@@ -243,6 +331,7 @@ def tracked_run(
         )
         raise
     else:
+        # Only the datasets this run actually verified and read are attributed to it.
+        record.data_manifests = data_manifest_ids(only=accessed_sources())
         # A runner that already called finish_run keeps its own metrics and status.
-        if record.status == "running":
-            finish_run(record, record.metrics)
+        finish_run(record, record.metrics) if record.status == "running" else append_run(record)
