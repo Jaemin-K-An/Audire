@@ -335,11 +335,14 @@ class LoudnessLevels(BaseModel):
 
     @model_validator(mode="after")
     def _ordering(self) -> Self:
-        if self.mcl_db_hl is not None and self.ucl_db_hl is not None:
-            if self.ucl_db_hl < self.mcl_db_hl:
-                raise ValueError(
-                    f"UCL ({self.ucl_db_hl} dB HL) cannot be below MCL ({self.mcl_db_hl} dB HL)"
-                )
+        if (
+            self.mcl_db_hl is not None
+            and self.ucl_db_hl is not None
+            and self.ucl_db_hl < self.mcl_db_hl
+        ):
+            raise ValueError(
+                f"UCL ({self.ucl_db_hl} dB HL) cannot be below MCL ({self.mcl_db_hl} dB HL)"
+            )
         return self
 
     @property

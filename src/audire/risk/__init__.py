@@ -1,0 +1,56 @@
+"""Word-level mishearing risk: features, models, calibration and explanations."""
+
+from audire.risk.calibration import CalibratedRiskModel, CalibrationMethod
+from audire.risk.features import (
+    ABLATION_ARMS,
+    FeatureMatrix,
+    FeatureSpec,
+    PhonemeRisk,
+    WordContext,
+    build_matrix,
+    clinical_features,
+    confusion_features,
+    context_features,
+    phoneme_independence_risk,
+    phoneme_risks,
+    pta_features,
+    word_features,
+)
+from audire.risk.models import (
+    MODEL_REGISTRY,
+    MODEL_VERSION,
+    GradientBoostedRiskModel,
+    LogisticRiskModel,
+    PhonemeIndependenceRisk,
+    RiskModel,
+    WordScorer,
+    independence_scores,
+    make_model,
+)
+
+__all__ = [
+    "ABLATION_ARMS",
+    "MODEL_REGISTRY",
+    "MODEL_VERSION",
+    "CalibratedRiskModel",
+    "CalibrationMethod",
+    "FeatureMatrix",
+    "FeatureSpec",
+    "GradientBoostedRiskModel",
+    "LogisticRiskModel",
+    "PhonemeIndependenceRisk",
+    "PhonemeRisk",
+    "RiskModel",
+    "WordContext",
+    "WordScorer",
+    "build_matrix",
+    "clinical_features",
+    "confusion_features",
+    "context_features",
+    "independence_scores",
+    "make_model",
+    "phoneme_independence_risk",
+    "phoneme_risks",
+    "pta_features",
+    "word_features",
+]
