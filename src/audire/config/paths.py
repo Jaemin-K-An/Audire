@@ -8,11 +8,37 @@ variables so that the package works when installed outside a source checkout.
 from __future__ import annotations
 
 import os
+import sys
 from functools import lru_cache
 from pathlib import Path
 from typing import Final
 
 _MARKERS: Final[tuple[str, ...]] = ("pyproject.toml", "AGENTS.md")
+
+
+def _repo_root_or_none() -> Path | None:
+    """The repository root, or ``None`` when not running inside a source checkout."""
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        if all((parent / m).exists() for m in _MARKERS):
+            return parent
+    return None
+
+
+def user_data_dir() -> Path:
+    """OS-appropriate per-user application data directory.
+
+    Used for private listener data when AUDIRE is installed outside a source checkout.
+    Writing participant data into whatever directory the process happens to be started
+    from is not acceptable, and that is what ``cwd()/private`` amounted to.
+    """
+    if sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+    elif sys.platform == "win32":  # pragma: no cover - not exercised on this host
+        base = Path(os.environ.get("LOCALAPPDATA") or (Path.home() / "AppData" / "Local"))
+    else:
+        base = Path(os.environ.get("XDG_DATA_HOME") or (Path.home() / ".local" / "share"))
+    return (base / "audire").resolve()
 
 
 @lru_cache(maxsize=1)
@@ -26,11 +52,8 @@ def repo_root() -> Path:
     override = os.environ.get("AUDIRE_ROOT")
     if override:
         return Path(override).expanduser().resolve()
-    here = Path(__file__).resolve()
-    for parent in here.parents:
-        if all((parent / m).exists() for m in _MARKERS):
-            return parent
-    return Path.cwd().resolve()
+    found = _repo_root_or_none()
+    return found if found is not None else Path.cwd().resolve()
 
 
 def _env_path(var: str, default: Path) -> Path:
@@ -82,11 +105,24 @@ def artifacts_dir() -> Path:
 
 
 def private_dir() -> Path:
-    """Local, git-ignored storage for real listener profiles and calibration responses.
+    """Local storage for real listener profiles and calibration responses.
+
+    Resolution order:
+
+    1. ``AUDIRE_PRIVATE_DIR`` — explicit override, always wins.
+    2. ``<repo>/private`` when running inside a source checkout, which is git-ignored and
+       is what a developer expects.
+    3. :func:`user_data_dir` otherwise. An installed package must never fall back to the
+       current working directory: participant data would land wherever the process
+       happened to be launched from.
 
     Nothing under this directory may ever be committed. See docs/SYSTEM_SPEC.md §Privacy.
     """
-    return _env_path("AUDIRE_PRIVATE_DIR", repo_root() / "private")
+    override = os.environ.get("AUDIRE_PRIVATE_DIR")
+    if override:
+        return Path(override).expanduser().resolve()
+    checkout = _repo_root_or_none()
+    return (checkout / "private").resolve() if checkout else user_data_dir() / "private"
 
 
 def models_dir() -> Path:

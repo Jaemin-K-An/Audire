@@ -11,6 +11,8 @@ profile can never be mistaken for an observed one.
 from __future__ import annotations
 
 import json
+import os
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -19,6 +21,42 @@ from audire.config.paths import private_dir
 from audire.confusion.profile import ConfusionProfile
 from audire.identity import validate_listener_id as _validate_listener_id
 from audire.profile.schema import HearingProfile
+
+#: Owner-only permissions for real listener data on POSIX.
+_DIR_MODE = 0o700
+_FILE_MODE = 0o600
+
+
+def _secure_dir(path: Path) -> Path:
+    """Create ``path`` owner-only, tightening an existing directory if needed."""
+    path.mkdir(parents=True, exist_ok=True)
+    if os.name == "posix":
+        with suppress(OSError):
+            path.chmod(_DIR_MODE)
+    return path
+
+
+def _atomic_write(path: Path, text: str) -> Path:
+    """Write ``text`` to ``path`` atomically, owner-only.
+
+    A partial overwrite of a hearing profile or a calibration response file is worse than
+    a failed write: the listener's record would be silently corrupted. The payload is
+    written to a temporary file in the same directory, given owner-only permissions, then
+    moved into place with :func:`os.replace`, which is atomic on POSIX and Windows.
+    """
+    _secure_dir(path.parent)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        if os.name == "posix":
+            with suppress(OSError):
+                tmp.chmod(_FILE_MODE)
+        # `os.replace` (not `Path.replace`) so that the atomicity failure path is
+        # reachable in tests by patching one well-known symbol.
+        os.replace(tmp, path)  # noqa: PTH105
+    finally:
+        tmp.unlink(missing_ok=True)
+    return path
 
 
 class ProfileStoreError(RuntimeError):
@@ -82,23 +120,29 @@ class ProfileStore:
     # ------------------------------------------------------------------ write
 
     def save_hearing(self, profile: HearingProfile) -> Path:
-        path = self.hearing_path(profile.listener_id)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(profile.model_dump_json(indent=2), encoding="utf-8")
-        return path
+        return _atomic_write(
+            self.hearing_path(profile.listener_id), profile.model_dump_json(indent=2)
+        )
 
     def save_confusion(self, profile: ConfusionProfile) -> Path:
-        path = self.confusion_path(profile.listener_id)
-        profile.save_json(path)
-        return path
+        return _atomic_write(
+            self.confusion_path(profile.listener_id),
+            json.dumps(profile.to_dict(), ensure_ascii=False, indent=2),
+        )
 
     def append_responses(self, listener_id: str, rows: list[dict[str, Any]]) -> Path:
         """Append raw calibration responses as JSON lines (append-only audit trail)."""
         path = self.responses_path(listener_id)
-        path.parent.mkdir(parents=True, exist_ok=True)
+        _secure_dir(path.parent)
+        # Append-only audit trail, so this is a genuine append rather than a replacement.
+        # The mode is applied on creation and re-asserted cheaply afterwards.
+        existed = path.exists()
         with path.open("a", encoding="utf-8") as f:
             for row in rows:
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")
+        if os.name == "posix" and not existed:
+            with suppress(OSError):
+                path.chmod(_FILE_MODE)
         return path
 
     # ------------------------------------------------------------------ read
