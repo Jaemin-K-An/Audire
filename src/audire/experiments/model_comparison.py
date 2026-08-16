@@ -242,6 +242,55 @@ def _agg(values: list[float]) -> dict[str, float]:
     }
 
 
+def _paired_against_reference(
+    rows: list[dict[str, Any]],
+    best: dict[str, Any] | None,
+    reference: dict[str, Any] | None,
+    primary: str,
+) -> dict[str, Any] | None:
+    """최고 후보와 참조 로지스틱의 **시드별 짝지은** 차이.
+
+    같은 시드는 같은 합성 코호트를 뜻하므로 두 모델을 같은 청취자 위에서 짝지을 수 있고,
+    짝지으면 코호트 간 변동이 상쇄되어 남는 것이 모델 차이입니다. 평균끼리 빼면 그 변동이
+    그대로 남아, 시드 간 편차보다 훨씬 작은 차이도 "이겼다" 로 보고됩니다.
+    """
+    if best is None or reference is None:
+        return None
+    if (best["model"], best["calibration_requested"]) == (
+        reference["model"],
+        reference["calibration_requested"],
+    ):
+        return {
+            "best_is_the_reference": True,
+            "n_seeds_best_beats_reference": 0,
+            "n_seeds": best["n_seeds"],
+            "paired_gain_mean": 0.0,
+            "paired_gain_sd": 0.0,
+            "beats_on_every_seed": False,
+        }
+
+    def pick(entry: dict[str, Any]) -> dict[int, float]:
+        return {
+            r["seed"]: r["budgets"][primary]["recall"]
+            for r in rows
+            if r["model"] == entry["model"]
+            and r["calibration_requested"] == entry["calibration_requested"]
+        }
+
+    b, ref = pick(best), pick(reference)
+    seeds = sorted(set(b) & set(ref))
+    diffs = np.array([b[s] - ref[s] for s in seeds], dtype=np.float64)
+    n_wins = int((diffs > 0).sum())
+    return {
+        "best_is_the_reference": False,
+        "n_seeds_best_beats_reference": n_wins,
+        "n_seeds": len(seeds),
+        "paired_gain_mean": float(diffs.mean()) if diffs.size else float("nan"),
+        "paired_gain_sd": float(diffs.std(ddof=1)) if diffs.size > 1 else 0.0,
+        "beats_on_every_seed": bool(seeds and n_wins == len(seeds)),
+    }
+
+
 def _summarise(cfg: ModelComparisonConfig, rows: list[dict[str, Any]]) -> dict[str, Any]:
     """시드에 걸쳐 집계합니다. 유리한 한 시드를 보고할 수 없는 구조입니다."""
     primary = f"{cfg.primary_budget:g}"
@@ -304,6 +353,14 @@ def _summarise(cfg: ModelComparisonConfig, rows: list[dict[str, Any]]) -> dict[s
         None,
     )
 
+    # 참조 기저선 대비 판정은 **시드별로 짝지어** 합니다.
+    #
+    # 평균끼리 비교하면 시드 간 변동보다 훨씬 작은 차이도 "이겼다" 로 보고됩니다. 실제로
+    # E23 축소 A/B 에서 평균 차이 +0.0006 이 승리로 보고됐는데, 같은 데이터의 시드별 짝지은
+    # 차이는 10개 중 6개만 양수인 사실상 동전 던지기였습니다. 같은 시드는 같은 코호트를
+    # 뜻하므로 짝짓기가 가능하고, 짝지으면 코호트 변동이 상쇄되어 남는 것이 모델 차이입니다.
+    paired = _paired_against_reference(rows, best, reference, primary)
+
     headline: dict[str, Any] = {
         "primary_budget": cfg.primary_budget,
         "n_candidates": len(table),
@@ -324,11 +381,10 @@ def _summarise(cfg: ModelComparisonConfig, rows: list[dict[str, Any]]) -> dict[s
             "n_seeds_beating_word_length": reference["n_seeds_beating_word_length"],
         },
         # 새 계열이 참조 기저선을 실제로 이겼는가. 이기지 못했다면 그대로 적습니다.
-        "best_beats_reference_logistic": None
-        if best is None or reference is None
-        else bool(
-            best["gain_over_word_length"]["mean"] > reference["gain_over_word_length"]["mean"]
-        ),
+        # 판정 기준은 **모든 시드에서 짝지어 이기는 것**입니다. 평균 비교는 시드 간 변동보다
+        # 작은 차이도 승리로 만들어 버립니다.
+        "vs_reference_logistic": paired,
+        "best_beats_reference_logistic": None if paired is None else paired["beats_on_every_seed"],
         "caveat": (
             "합성 청취자 코호트에서 얻은 결과이며 임상적 근거가 아닙니다. 로지스틱 회귀는 "
             "ADR-0012 에 따라 참조 기저선으로 유지되며, 여기서의 우위만으로 교체되지 않습니다."

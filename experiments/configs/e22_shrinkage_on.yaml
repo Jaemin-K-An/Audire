@@ -1,0 +1,34 @@
+# AUDIRE E23 — 집단 사전분포 축소(D18)의 짝지은 A/B, on 조건.
+#
+# e22_shrinkage_off.yaml 과 e22_shrinkage_on.yaml 은 group_shrinkage 한 줄만 다릅니다.
+# 시드, 모델, arm, 폴드 수, 예산이 모두 같으므로 두 실행의 차이는 축소 효과입니다.
+#
+# 축소는 폴드마다 훈련 청취자만으로 사전분포를 다시 적합합니다 (ADR-0017). 전체 코호트로
+# 적합하면 홀드아웃 청취자의 응답이 학습 표현에 새어들고 모든 지표가 부풀려지며, 청취자
+# 단위 그룹 분할은 그 누출을 전혀 잡지 못합니다.
+
+name: e23_shrinkage_on
+description: >-
+  집단 사전분포 축소 on 조건. 짝을 이루는 실행은 e23_shrinkage_off 입니다.
+
+simulation:
+  name: e23_shrinkage_cohort
+  seeds: [101, 202, 303, 404, 505]
+  n_listeners: 80
+  # 교정 시행을 짧게 둡니다. 축소가 의미를 갖는 것은 관측되지 않은 행이 많을 때입니다.
+  n_calibration_trials: 25
+  n_word_trials: 250
+  snr_conditions_db: [20.0]
+  speakers: [male, female]
+
+models: [logistic, residual]
+arm: clinical_plus_confusion_rich
+fallback_arm: clinical_plus_confusion
+calibrations: [none]
+
+group_shrinkage: true
+n_splits: 5
+n_bootstrap: 100
+ece_bins: 10
+budgets: [0.10, 0.20, 0.30, 0.50]
+primary_budget: 0.20

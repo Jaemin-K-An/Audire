@@ -269,3 +269,51 @@ def test_uncalibrated_rows_state_their_effective_method_explicitly(result):
         assert row["effective_methods"], row["model"]
         if row["calibration_requested"] == "none":
             assert row["effective_methods"] == ["none"]
+
+
+def test_reference_verdict_uses_paired_seeds_not_a_mean_comparison():
+    """회귀 테스트.
+
+    이전 구현은 평균끼리 비교해 판정했습니다. 시드 간 변동보다 훨씬 작은 차이도 "이겼다"
+    로 보고되며, 실제로 E23 축소 A/B 에서 평균 차이 +0.0006 이 승리로 보고됐는데 같은
+    데이터의 시드별 짝지은 차이는 10개 중 6개만 양수인 동전 던지기였습니다.
+    """
+    from audire.experiments.model_comparison import _paired_against_reference
+
+    best = {"model": "residual", "calibration_requested": "none", "n_seeds": 4}
+    ref = {"model": "logistic", "calibration_requested": "none", "n_seeds": 4}
+    # 평균으로는 후보가 이기지만(+0.005), 짝지으면 4개 중 1개 시드에서만 우세합니다.
+    recalls = {
+        ("residual", 1): 0.30,
+        ("logistic", 1): 0.28,
+        ("residual", 2): 0.20,
+        ("logistic", 2): 0.21,
+        ("residual", 3): 0.20,
+        ("logistic", 3): 0.21,
+        ("residual", 4): 0.20,
+        ("logistic", 4): 0.21,
+    }
+    rows = [
+        {
+            "model": m,
+            "seed": s,
+            "calibration_requested": "none",
+            "budgets": {"0.2": {"recall": v}},
+        }
+        for (m, s), v in recalls.items()
+    ]
+    paired = _paired_against_reference(rows, best, ref, "0.2")
+    assert paired["n_seeds_best_beats_reference"] == 1
+    assert paired["beats_on_every_seed"] is False
+    assert paired["paired_gain_sd"] > abs(paired["paired_gain_mean"]), (
+        "시드 간 편차가 평균 차이보다 크면 승리로 보고해서는 안 됩니다"
+    )
+
+
+def test_best_candidate_being_the_reference_is_not_reported_as_a_win():
+    from audire.experiments.model_comparison import _paired_against_reference
+
+    ref = {"model": "logistic", "calibration_requested": "none", "n_seeds": 3}
+    paired = _paired_against_reference([], ref, ref, "0.2")
+    assert paired["best_is_the_reference"] is True
+    assert paired["beats_on_every_seed"] is False

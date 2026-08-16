@@ -206,11 +206,19 @@ def model_compare(config: ConfigOpt) -> None:
             f"  참조 로지스틱: 길이대비 {r['gain_over_word_length']:+.4f} "
             f"({r['n_seeds_beating_word_length']}개 시드에서 우세)"
         )
-    verdict = head["best_beats_reference_logistic"]
-    typer.echo(
-        "  새 계열이 참조 기저선을 이겼는가: "
-        + ("판정 불가 (자격을 갖춘 후보 없음)" if verdict is None else str(verdict))
-    )
+    paired = head["vs_reference_logistic"]
+    if paired is None:
+        typer.echo("  새 계열이 참조 기저선을 이겼는가: 판정 불가 (자격을 갖춘 후보 없음)")
+    elif paired["best_is_the_reference"]:
+        typer.echo("  최고 후보가 곧 참조 기저선입니다 — 새 계열이 이기지 못했습니다.")
+    else:
+        # 평균 차이가 아니라 시드별 짝지은 차이로 판정합니다.
+        typer.echo(
+            f"  참조 대비 짝지은 차이: {paired['paired_gain_mean']:+.5f} "
+            f"+-{paired['paired_gain_sd']:.5f}  "
+            f"({paired['n_seeds_best_beats_reference']}/{paired['n_seeds']} 시드에서 우세)"
+        )
+        typer.echo(f"  모든 시드에서 참조를 이겼는가: {paired['beats_on_every_seed']}")
     for row in summary["table"]:
         for reason in row["fallback_reasons"]:
             typer.echo(f"  교정 폴백 [{row['model']}/{row['calibration_requested']}]: {reason}")
