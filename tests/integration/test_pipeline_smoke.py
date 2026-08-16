@@ -67,7 +67,7 @@ RECORDED = {
 
 
 @pytest.fixture(scope="module")
-def fitted():  # noqa: ANN201
+def fitted():
     """A cohort, a fitted scorer and one listener's profiles."""
     cohort = build_cohort(CFG, 31)
     spec = FeatureSpec.arm("clinical_plus_confusion", speakers=("male", "female", "unknown"))
@@ -93,7 +93,7 @@ def backend(tmp_path: Path) -> ReplayBackend:
 # =========================================================== end to end
 
 
-def test_full_pipeline_produces_captions_and_all_three_exports(fitted, media, backend) -> None:  # noqa: ANN001
+def test_full_pipeline_produces_captions_and_all_three_exports(fitted, media, backend) -> None:
     scorer, record = fitted
     result = caption_media(
         media,
@@ -125,7 +125,7 @@ def test_full_pipeline_produces_captions_and_all_three_exports(fitted, media, ba
     assert payload["provenance"]["asr"]["backend"] == "replay"
 
 
-def test_every_word_carries_risk_and_asr_confidence_separately(fitted, media, backend) -> None:  # noqa: ANN001
+def test_every_word_carries_risk_and_asr_confidence_separately(fitted, media, backend) -> None:
     scorer, record = fitted
     result = caption_media(
         media,
@@ -144,7 +144,7 @@ def test_every_word_carries_risk_and_asr_confidence_separately(fitted, media, ba
     assert low_conf.explanation()["asr_confidence"] == pytest.approx(0.41)
 
 
-def test_non_hangul_token_is_kept_but_flagged_unscoreable(fitted, media, backend) -> None:  # noqa: ANN001
+def test_non_hangul_token_is_kept_but_flagged_unscoreable(fitted, media, backend) -> None:
     """A Korean confusion profile cannot score '2024'; dropping it silently would be worse."""
     scorer, record = fitted
     result = caption_media(
@@ -162,7 +162,7 @@ def test_non_hangul_token_is_kept_but_flagged_unscoreable(fitted, media, backend
     assert numeral.contributions == ()
 
 
-def test_explanations_name_the_phonemes_and_their_evidence(fitted, media, backend) -> None:  # noqa: ANN001
+def test_explanations_name_the_phonemes_and_their_evidence(fitted, media, backend) -> None:
     scorer, record = fitted
     result = caption_media(
         media,
@@ -181,7 +181,7 @@ def test_explanations_name_the_phonemes_and_their_evidence(fitted, media, backen
     assert exp["model_arm"] == "clinical_plus_confusion"
 
 
-def test_the_three_caption_modes_show_different_amounts(fitted, media, backend) -> None:  # noqa: ANN001
+def test_the_three_caption_modes_show_different_amounts(fitted, media, backend) -> None:
     scorer, record = fitted
     kwargs = {
         "listener_id": record.listener_id,
@@ -200,7 +200,7 @@ def test_the_three_caption_modes_show_different_amounts(fitted, media, backend) 
 
 def test_asr_confidence_floor_surfaces_the_uncertain_token_distinctly(
     fitted, media, backend
-) -> None:  # noqa: ANN001
+) -> None:
     scorer, record = fitted
     result = caption_media(
         media,
@@ -218,7 +218,7 @@ def test_asr_confidence_floor_surfaces_the_uncertain_token_distinctly(
     assert not any(w.decision is CaptionDecision.SHOWN_HIGH_RISK for w in shown)
 
 
-def test_pipeline_is_deterministic(fitted, media, backend) -> None:  # noqa: ANN001
+def test_pipeline_is_deterministic(fitted, media, backend) -> None:
     scorer, record = fitted
     kwargs = {
         "listener_id": record.listener_id,
@@ -232,7 +232,7 @@ def test_pipeline_is_deterministic(fitted, media, backend) -> None:  # noqa: ANN
     assert to_srt(a.words) == to_srt(b.words)
 
 
-def test_result_summary_reports_asr_and_listener_provenance(fitted, media, backend) -> None:  # noqa: ANN001
+def test_result_summary_reports_asr_and_listener_provenance(fitted, media, backend) -> None:
     scorer, record = fitted
     summary = caption_media(
         media,
@@ -251,7 +251,7 @@ def test_result_summary_reports_asr_and_listener_provenance(fitted, media, backe
 # =========================================================== failure paths
 
 
-def test_missing_media_file_is_reported(fitted, backend) -> None:  # noqa: ANN001
+def test_missing_media_file_is_reported(fitted, backend) -> None:
     scorer, record = fitted
     with pytest.raises(ValueError, match="recorded transcript was produced from"):
         caption_media(
@@ -264,7 +264,7 @@ def test_missing_media_file_is_reported(fitted, backend) -> None:  # noqa: ANN00
         )
 
 
-def test_missing_confusion_profile_fails_loudly(fitted, media, backend) -> None:  # noqa: ANN001
+def test_missing_confusion_profile_fails_loudly(fitted, media, backend) -> None:
     scorer, record = fitted
     with pytest.raises(IncompleteProfile, match="run a calibration first"):
         caption_media(
@@ -277,7 +277,7 @@ def test_missing_confusion_profile_fails_loudly(fitted, media, backend) -> None:
         )
 
 
-def test_too_little_calibration_fails_loudly(fitted, media, backend) -> None:  # noqa: ANN001
+def test_too_little_calibration_fails_loudly(fitted, media, backend) -> None:
     """A plausible-looking score from three trials would be worse than an error."""
     from audire.confusion import CalibrationTrial, ConfusionProfile
 
@@ -300,7 +300,7 @@ def test_too_little_calibration_fails_loudly(fitted, media, backend) -> None:  #
         )
 
 
-def test_unfitted_model_is_refused(fitted, media, backend) -> None:  # noqa: ANN001
+def test_unfitted_model_is_refused(fitted, media, backend) -> None:
     _, record = fitted
     spec = FeatureSpec.arm("clinical_plus_confusion")
     unfitted = WordScorer(model=LogisticRiskModel(), spec=spec)
@@ -308,7 +308,7 @@ def test_unfitted_model_is_refused(fitted, media, backend) -> None:  # noqa: ANN
     assert "the risk model is not fitted" in problems
 
 
-def test_replay_refuses_a_mismatched_media_file(tmp_path: Path, backend) -> None:  # noqa: ANN001
+def test_replay_refuses_a_mismatched_media_file(tmp_path: Path, backend) -> None:
     other = tmp_path / "different.wav"
     other.write_bytes(b"RIFF")
     with pytest.raises(ValueError, match="Pass allow_media_mismatch=True"):
@@ -318,7 +318,7 @@ def test_replay_refuses_a_mismatched_media_file(tmp_path: Path, backend) -> None
     assert len(permissive.transcribe(other)) == len(RECORDED["tokens"])
 
 
-def test_replay_preserves_the_original_backend_identity(backend, media) -> None:  # noqa: ANN001
+def test_replay_preserves_the_original_backend_identity(backend, media) -> None:
     t = backend.transcribe(media)
     assert t.backend == "faster-whisper"
     assert t.provenance["replayed"] is True
@@ -367,7 +367,7 @@ def test_token_hangul_extraction() -> None:
     assert Token("A가B", 0.0, 0.5).hangul_text == "가"
 
 
-def test_transcript_roundtrips_through_disk(tmp_path: Path, backend, media) -> None:  # noqa: ANN001
+def test_transcript_roundtrips_through_disk(tmp_path: Path, backend, media) -> None:
     original = backend.transcribe(media)
     path = save_transcript(original, tmp_path / "out.json")
     restored = ReplayBackend(path, allow_media_mismatch=True).transcribe(media)
@@ -377,7 +377,7 @@ def test_transcript_roundtrips_through_disk(tmp_path: Path, backend, media) -> N
 
 def test_score_transcript_without_a_policy_leaves_decisions_unapplied(
     fitted, backend, media
-) -> None:  # noqa: ANN001
+) -> None:
     scorer, record = fitted
     words = score_transcript(
         backend.transcribe(media),
