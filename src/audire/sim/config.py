@@ -99,9 +99,9 @@ class AudiogramModel(Evidenced):
     )
     #: Mean high-frequency slope in dB per octave (500 Hz -> 4 kHz), and its spread.
     slope_db_per_octave_mean: float = 6.0
-    slope_db_per_octave_sd: float = 3.0
+    slope_db_per_octave_sd: float = Field(default=3.0, gt=0.0)
     #: Independent per-frequency measurement noise, dB.
-    threshold_noise_db_sd: float = 4.0
+    threshold_noise_db_sd: float = Field(default=4.0, gt=0.0)
     #: Interaural asymmetry, dB.
     interaural_asymmetry_db_sd: float = 5.0
     pta_method: PTAMethod = PTAMethod.PTA4
@@ -131,11 +131,11 @@ class SpeechScoreModel(Evidenced):
         }
     )
     #: Between-listener spread of latent ability within a stratum (logit scale).
-    ability_sd_logit: float = 0.55
+    ability_sd_logit: float = Field(default=0.55, gt=0.0)
     #: SRT is sampled around the PTA; agreement within about +-6..10 dB is the clinical
     #: expectation for a reliable test.
     srt_minus_pta_mean_db: float = 0.0
-    srt_minus_pta_sd_db: float = 5.0
+    srt_minus_pta_sd_db: float = Field(default=5.0, gt=0.0)
     #: A single-level WRS is a noisy binomial estimate over `wrs_n_words` items.
     wrs_n_words: int = 50
     #: PBmax is at least the single-level WRS; this is the mean increment.
@@ -184,6 +184,8 @@ class ConfusionModel(Evidenced):
     similarity_beta_severe: float = 4.0
     #: Dirichlet concentration: higher means listeners resemble the structural prior more
     #: closely; lower means more between-listener heterogeneity.
+    #: Higher means listeners resemble the structural prior more closely. Must be
+    #: positive: a Dirichlet concentration of zero or less is not a distribution.
     dirichlet_concentration: float = Field(default=40.0, gt=0.0)
     #: Probability mass reserved for "no usable response", scaled by error mass.
     no_response_share: UnitInterval = 0.05
@@ -264,8 +266,8 @@ class SimulationConfig(BaseModel):
     #: Word-level trials per listener, used for risk-model training and evaluation.
     n_word_trials: int = Field(default=300, ge=1)
     #: SNR conditions to generate word trials under.
-    snr_conditions_db: list[float] = Field(default_factory=lambda: [20.0])
-    speakers: list[str] = Field(default_factory=lambda: ["male", "female"])
+    snr_conditions_db: list[float] = Field(default_factory=lambda: [20.0], min_length=1)
+    speakers: list[str] = Field(default_factory=lambda: ["male", "female"], min_length=1)
 
     severity: SeverityMix = Field(default_factory=SeverityMix)
     audiogram: AudiogramModel = Field(default_factory=AudiogramModel)

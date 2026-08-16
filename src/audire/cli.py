@@ -123,16 +123,19 @@ def sensitivity(config: ConfigOpt) -> None:
     summary = result["summary"]
 
     typer.echo(f"\nrun_id: {result['run_id']}   격자 칸 수: {summary['n_cells']}\n")
+    # 예산과 모델을 반드시 함께 표시한다. 빼면 서로 다른 조건이 중복 행처럼 보인다.
     typer.echo(
-        f"{'집중도':>8s} {'교정길이':>9s} {'arm':26s} {'PR-AUC':>8s} "
-        f"{'재현율':>8s} {'단어길이대비':>12s} {'이긴시드':>9s}"
+        f"{'집중도':>7s} {'교정':>5s} {'예산':>5s} {'model':18s} {'arm':26s} "
+        f"{'PR-AUC':>8s} {'재현율':>8s} {'최하위':>8s} {'길이대비':>10s} {'이긴시드':>9s}"
     )
-    typer.echo("-" * 90)
+    typer.echo("-" * 122)
     for g in summary["grid"]:
         typer.echo(
-            f"{g['dirichlet_concentration']:8.1f} {g['n_calibration_trials']:9d} "
-            f"{g['arm']:26s} {g['pr_auc_mean']:8.4f} {g['misheard_recall_mean']:8.4f} "
-            f"{g['recall_over_word_length_mean']:+12.4f} "
+            f"{g['dirichlet_concentration']:7.1f} {g['n_calibration_trials']:5d} "
+            f"{g['budget']:5.2f} {g['model']:18s} {g['arm']:26s} "
+            f"{g['pr_auc_mean']:8.4f} {g['misheard_recall_mean']:8.4f} "
+            f"{g['worst_listener_recall_mean']:8.4f} "
+            f"{g['recall_over_word_length_mean']:+10.4f} "
             f"{g['n_seeds_beating_word_length']:4d}/{g['n_seeds']:<4d}"
         )
     head = summary["headline"]
