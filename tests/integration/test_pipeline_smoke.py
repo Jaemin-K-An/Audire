@@ -353,7 +353,7 @@ def test_transcript_detects_overlapping_and_out_of_order_tokens() -> None:
 
 
 def test_token_validates_timing_and_confidence() -> None:
-    with pytest.raises(ValueError, match="ends .* before it starts"):
+    with pytest.raises(ValueError, match=r"ends .* before it starts"):
         Token("가", 1.0, 0.5)
     with pytest.raises(ValueError, match="negative start time"):
         Token("가", -0.1, 0.5)
