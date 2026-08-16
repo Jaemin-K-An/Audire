@@ -11,18 +11,14 @@ profile can never be mistaken for an observed one.
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from audire.config.paths import private_dir
 from audire.confusion.profile import ConfusionProfile
+from audire.identity import validate_listener_id as _validate_listener_id
 from audire.profile.schema import HearingProfile
-
-#: Listener ids are used as filenames, so they are restricted to a safe alphabet. This
-#: also discourages putting a person's name in the id.
-_SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
 
 class ProfileStoreError(RuntimeError):
@@ -30,13 +26,17 @@ class ProfileStoreError(RuntimeError):
 
 
 def validate_listener_id(listener_id: str) -> str:
-    if not _SAFE_ID.match(listener_id):
-        raise ProfileStoreError(
-            f"invalid listener id {listener_id!r}: use 1-64 characters from "
-            f"[A-Za-z0-9._-] starting alphanumeric. Do not use names or other direct "
-            f"identifiers."
-        )
-    return listener_id
+    """Shared identifier rule, re-raised as a store error for callers of this module.
+
+    The rule itself lives in :mod:`audire.identity` so that the schema, the
+    store, the scoring boundary and the API cannot drift apart — previously the store
+    enforced a safe alphabet while the schema checked only the length, so a profile the
+    schema accepted could be rejected on save.
+    """
+    try:
+        return _validate_listener_id(listener_id)
+    except ValueError as exc:
+        raise ProfileStoreError(str(exc)) from exc
 
 
 @dataclass(frozen=True, slots=True)

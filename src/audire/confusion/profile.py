@@ -18,6 +18,7 @@ from typing import Any, Self
 from audire.confusion.errors import ParsedTrial, parse_response
 from audire.confusion.matrix import ConfusionMatrix, SmoothingSpec
 from audire.hangul.inventory import Position
+from audire.identity import validate_listener_id
 
 POSITIONS: tuple[Position, ...] = (Position.ONSET, Position.NUCLEUS, Position.CODA)
 
@@ -63,6 +64,10 @@ class ConfusionProfile:
     provenance: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        # The same identifier rule as the hearing profile and the store. Aggregates such
+        # as ``__pooled__`` are permitted here because a group prior is a legitimate kind
+        # of confusion profile; it is not permitted as a scoring subject.
+        validate_listener_id(self.listener_id, allow_aggregate=True)
         missing = [p for p in POSITIONS if p not in self.matrices]
         if missing:
             raise ValueError(f"confusion profile is missing matrices for: {missing}")

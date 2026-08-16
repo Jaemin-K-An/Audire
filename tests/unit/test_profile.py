@@ -355,7 +355,9 @@ def test_store_roundtrip_and_listing(tmp_path) -> None:
 def test_store_rejects_unsafe_listener_ids(tmp_path) -> None:
     store = ProfileStore(tmp_path)
     for bad in ("../escape", "a/b", "", "x" * 65, ".hidden", "김철수"):
-        with pytest.raises(ProfileStoreError, match="invalid listener id"):
+        # 메시지 문구가 아니라 '거부한다'는 동작에 묶는다. 실제 규칙은
+        # audire.identity 한 곳에 있고 그 문구는 바뀔 수 있다.
+        with pytest.raises(ProfileStoreError):
             store.hearing_path(bad)
 
 

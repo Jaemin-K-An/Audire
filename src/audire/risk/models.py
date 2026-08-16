@@ -309,6 +309,7 @@ class WordScorer:
 
     model: RiskModel
     spec: FeatureSpec
+    provenance: dict[str, Any] = field(default_factory=dict)
 
     def score(
         self,
@@ -320,6 +321,20 @@ class WordScorer:
     ) -> FloatArray:
         if len(words) != len(contexts):
             raise ValueError("words and contexts must have the same length")
+        # Defended here as well as in the pipeline: the scorer is a public entry point,
+        # so checking only the pipeline would leave a way to score one listener with
+        # another listener's profile.
+        if confusion is not None and confusion.listener_id != listener_id:
+            raise ValueError(
+                f"confusion profile belongs to listener {confusion.listener_id!r} but "
+                f"{listener_id!r} was requested"
+            )
+        hearing_id = getattr(hearing, "listener_id", None)
+        if hearing_id is not None and hearing_id != listener_id:
+            raise ValueError(
+                f"hearing profile belongs to listener {hearing_id!r} but "
+                f"{listener_id!r} was requested"
+            )
         if not words:
             return np.zeros(0, dtype=np.float64)
         matrix = build_matrix(
@@ -333,6 +348,7 @@ class WordScorer:
             "model": self.model.describe(),
             "arm": self.spec.name,
             "blocks": list(self.spec.blocks),
+            "provenance": self.provenance,
         }
 
     def save_description(self, path: Path) -> None:

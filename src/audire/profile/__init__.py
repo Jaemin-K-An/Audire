@@ -1,5 +1,12 @@
 """Clinical hearing profile schema, derived measures and private local storage."""
 
+from audire.identity import (
+    MAX_LISTENER_ID_LENGTH,
+    ListenerId,
+    ListenerOrAggregateId,
+    is_aggregate_id,
+    validate_listener_id,
+)
 from audire.profile.schema import (
     DEFAULT_PTA_METHOD,
     MAX_DB_HL,
@@ -22,16 +29,12 @@ from audire.profile.schema import (
     SpeechScores,
     severity_stratum,
 )
-from audire.profile.store import (
-    ProfileStore,
-    ProfileStoreError,
-    StoredProfile,
-    validate_listener_id,
-)
+from audire.profile.store import ProfileStore, ProfileStoreError, StoredProfile
 
 __all__ = [
     "DEFAULT_PTA_METHOD",
     "MAX_DB_HL",
+    "MAX_LISTENER_ID_LENGTH",
     "MIN_DB_HL",
     "PTA_CALC_VERSION",
     "PTA_FREQUENCIES",
@@ -42,6 +45,8 @@ __all__ = [
     "EarProfile",
     "HearingAidState",
     "HearingProfile",
+    "ListenerId",
+    "ListenerOrAggregateId",
     "LoudnessLevels",
     "PIFunction",
     "PIPoint",
@@ -52,6 +57,7 @@ __all__ = [
     "SeverityScheme",
     "SpeechScores",
     "StoredProfile",
+    "is_aggregate_id",
     "severity_stratum",
     "validate_listener_id",
 ]

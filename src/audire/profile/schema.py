@@ -21,6 +21,8 @@ from typing import Annotated, Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from audire.identity import ListenerId
+
 #: Audiometric test frequencies in Hz, in ascending order.
 STANDARD_FREQUENCIES: tuple[int, ...] = (125, 250, 500, 1000, 2000, 3000, 4000, 6000, 8000)
 
@@ -387,7 +389,8 @@ class HearingProfile(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     #: Opaque identifier. Must never be a name, initials, or any direct identifier.
-    listener_id: str = Field(min_length=1, max_length=64)
+    #: Validated by the single shared rule in :mod:`audire.identity`.
+    listener_id: ListenerId
     source: ProfileSource
     is_synthetic: bool
     left: EarProfile | None = None

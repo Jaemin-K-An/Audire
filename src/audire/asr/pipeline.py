@@ -20,6 +20,7 @@ from audire.caption.policy import CaptionPolicy, FullCaptionPolicy, caption_rati
 from audire.caption.word import CaptionDecision, WordRisk
 from audire.config.logging import get_logger
 from audire.confusion.profile import ConfusionProfile
+from audire.identity import validate_listener_id
 from audire.profile.schema import HearingProfile
 from audire.risk.features import WordContext, phoneme_risks
 from audire.risk.models import MODEL_VERSION, WordScorer
@@ -70,19 +71,69 @@ class IncompleteProfile(ValueError):
     """Raised when the listener's profile cannot support the requested scoring arm."""
 
 
+def check_identity(
+    listener_id: str,
+    hearing: HearingProfile | None,
+    confusion: ConfusionProfile | None,
+) -> list[str]:
+    """Return the reasons these inputs do not describe one and the same listener.
+
+    Two invariants, both of which used to be unchecked:
+
+    1. **The three identifiers must agree.** Scoring listener A with listener B's profile
+       produces a confident, plausible-looking number for the wrong person. In an
+       accessibility tool that means captioning tuned to someone else.
+    2. **Synthetic provenance must agree.** Combining a real hearing profile with a
+       synthetic confusion profile launders simulated evidence into a result about a real
+       person, which ``docs/RISK_REGISTER.md`` S1 forbids.
+    """
+    problems: list[str] = []
+    try:
+        validate_listener_id(listener_id)
+    except ValueError as exc:
+        problems.append(str(exc))
+
+    for label, profile in (("hearing", hearing), ("confusion", confusion)):
+        if profile is None:
+            continue
+        if profile.listener_id != listener_id:
+            problems.append(
+                f"{label} profile belongs to listener {profile.listener_id!r} but "
+                f"{listener_id!r} was requested; refusing to score one listener with "
+                f"another listener's profile"
+            )
+
+    if (
+        hearing is not None
+        and confusion is not None
+        and hearing.is_synthetic != confusion.is_synthetic
+    ):
+        problems.append(
+            f"provenance mismatch: hearing profile is_synthetic="
+            f"{hearing.is_synthetic} but confusion profile is_synthetic="
+            f"{confusion.is_synthetic}. 합성(synthetic) 근거와 실측 근거를 섞을 수 "
+            f"없습니다."
+        )
+    return problems
+
+
 def check_ready(
     scorer: WordScorer,
     hearing: HearingProfile | None,
     confusion: ConfusionProfile | None,
     *,
+    listener_id: str | None = None,
     min_calibration_trials: int = 10,
 ) -> list[str]:
     """Return the reasons this listener cannot be scored yet. Empty means ready.
 
     Fails loudly and specifically rather than producing a plausible-looking score from a
-    profile that has no evidence behind it.
+    profile that has no evidence behind it. When ``listener_id`` is supplied the identity
+    invariants in :func:`check_identity` are enforced as well.
     """
     problems: list[str] = []
+    if listener_id is not None:
+        problems.extend(check_identity(listener_id, hearing, confusion))
     blocks = set(scorer.spec.blocks)
     if ({"pta", "clinical"} & blocks) and hearing is None:
         problems.append(f"arm {scorer.spec.name!r} needs a hearing profile; none was supplied")
@@ -118,7 +169,7 @@ def score_transcript(
     confusion profile. They are kept with ``listener_risk = 0.0`` and a ``meta`` flag
     rather than being dropped, so the caption renderer decides what to do with them.
     """
-    problems = check_ready(scorer, hearing, confusion)
+    problems = check_ready(scorer, hearing, confusion, listener_id=listener_id)
     if problems:
         raise IncompleteProfile("; ".join(problems))
 
