@@ -233,6 +233,7 @@ def evaluate_arm(
     description: dict[str, Any] = {}
     fold_sizes: list[tuple[int, int]] = []
     shrinkage_log: list[dict[str, Any]] = []
+    calibration_log: list[dict[str, Any]] = []
 
     for fold in folds:
         # Re-assert on every fold: the guard is cheap and this is the failure mode that
@@ -270,8 +271,29 @@ def evaluate_arm(
         description = model.describe()
         fold_sizes.append((fold.n_train, fold.n_test))
 
+        if isinstance(model, CalibratedRiskModel):
+            # Per fold, not once at the end. A calibrator can fall back on some folds and
+            # not others, and a single end-of-loop snapshot would report whichever fold
+            # happened to run last as if it described the whole run.
+            calibration_log.append(
+                {
+                    "fold": fold.index,
+                    "requested_method": description["requested_method"],
+                    "effective_method": description["effective_method"],
+                    "fell_back": description["fell_back"],
+                    "fallback_reason": description["fallback_reason"],
+                    "n_calibration_listeners": description["n_calibration_listeners"],
+                }
+            )
+
     if shrinkage_log:
         description = {**description, "group_shrinkage": shrinkage_log}
+    if calibration_log:
+        description = {
+            **description,
+            "calibration_per_fold": calibration_log,
+            "n_folds_fell_back": sum(1 for e in calibration_log if e["fell_back"]),
+        }
 
     if np.any(~np.isfinite(oof)):
         raise RuntimeError(

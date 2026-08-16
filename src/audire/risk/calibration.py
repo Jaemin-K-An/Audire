@@ -63,6 +63,8 @@ class CalibratedRiskModel(RiskModel):
     """
 
     base: RiskModel = field(default_factory=lambda: _require_base())
+    #: What the experiment configuration asked for. Never mutated, so a run record can
+    #: always answer "what was requested?" independently of what was achievable.
     method: CalibrationMethod = "platt"
     holdout_fraction: float = 0.25
     seed: int = 0
@@ -71,15 +73,39 @@ class CalibratedRiskModel(RiskModel):
     _isotonic: IsotonicRegression | None = None
     _fitted: bool = False
     n_calibration_listeners: int = 0
+    #: What actually ran. Differs from :attr:`method` only after a recorded fallback.
+    effective_method: CalibrationMethod = "platt"
+    fallback_reason: str | None = None
 
     def __post_init__(self) -> None:
         if not 0.0 < self.holdout_fraction < 1.0:
             raise ValueError("holdout_fraction must be in (0, 1)")
         self.name = f"{self.base.name}+{self.method}"
+        self.effective_method = self.method
+
+    def _fall_back(self, matrix: FeatureMatrix, reason: str) -> CalibratedRiskModel:
+        """Refit uncalibrated, recording why.
+
+        An earlier version overwrote ``self.method`` here. That destroyed the only record
+        of what had been requested: ``describe()`` then reported ``method: "none"`` while
+        ``name`` still read ``"...+platt"``, so a run that deliberately used no calibration
+        was indistinguishable from one whose calibration silently failed. Comparing
+        calibration arms across folds is exactly the question E22 asks, and it cannot be
+        answered from an artifact that has forgotten the question.
+        """
+        self.effective_method = "none"
+        self.fallback_reason = reason
+        self.base.fit(matrix)
+        self._fitted = True
+        return self
 
     def fit(self, matrix: FeatureMatrix) -> CalibratedRiskModel:
         if matrix.y is None:
             raise ValueError("cannot fit a calibrator without labels")
+
+        self.effective_method = self.method
+        self.fallback_reason = None
+        self._platt = self._isotonic = None
 
         if self.method == "none":
             self.base.fit(matrix)
@@ -96,10 +122,11 @@ class CalibratedRiskModel(RiskModel):
         if np.unique(y_cal).size < 2:
             # Not enough label variety on the calibration slice to fit anything sensible.
             # Fall back to the uncalibrated base and say so, rather than fitting noise.
-            self.method = "none"
-            self.base.fit(matrix)
-            self._fitted = True
-            return self
+            return self._fall_back(
+                matrix,
+                f"교정 슬라이스({self.n_calibration_listeners}명)의 라벨이 한 종류뿐이라 "
+                f"{self.method} 교정기를 적합할 수 없었습니다",
+            )
 
         if self.method == "platt":
             self._platt = LogisticRegression(max_iter=1000)
@@ -113,7 +140,7 @@ class CalibratedRiskModel(RiskModel):
 
     def predict_proba(self, matrix: FeatureMatrix) -> FloatArray:
         raw = self.base.predict_proba(matrix)
-        if self.method == "none":
+        if self.effective_method == "none":
             return raw
         if self._platt is not None:
             out: FloatArray = self._platt.predict_proba(_logit(raw).reshape(-1, 1))[:, 1]
@@ -133,7 +160,12 @@ class CalibratedRiskModel(RiskModel):
         return {
             "name": self.name,
             "family": "calibrated",
-            "method": self.method,
+            # `method` is what was asked for and `effective_method` is what ran; reporting
+            # both is what makes a fallback visible instead of merely absent.
+            "requested_method": self.method,
+            "effective_method": self.effective_method,
+            "fell_back": self.effective_method != self.method,
+            "fallback_reason": self.fallback_reason,
             "holdout_fraction": self.holdout_fraction,
             "n_calibration_listeners": self.n_calibration_listeners,
             "base": self.base.describe(),

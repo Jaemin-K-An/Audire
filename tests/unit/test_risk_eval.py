@@ -491,7 +491,12 @@ def test_calibration_holds_out_whole_listeners(cohort) -> None:
     model.fit(m)
     assert model.n_calibration_listeners >= 1
     assert model.n_calibration_listeners < int(np.unique(m.groups).size)
-    assert model.describe()["method"] == "platt"
+    described = model.describe()
+    # 요청한 방법과 실제 수행된 방법을 모두 기록해야 폴백이 보입니다.
+    assert described["requested_method"] == "platt"
+    assert described["effective_method"] == "platt"
+    assert described["fell_back"] is False
+    assert described["fallback_reason"] is None
 
 
 def test_calibration_none_passes_probabilities_through(cohort) -> None:

@@ -152,6 +152,71 @@ def sensitivity(config: ConfigOpt) -> None:
     typer.echo(f"\n단서: {head['caveat']}")
 
 
+@app.command("model-compare")
+def model_compare(config: ConfigOpt) -> None:
+    """E22 — 후보 모델 계열과 교정 방법의 청취자 수준 비교."""
+    from audire.experiments.model_comparison import ModelComparisonConfig, run_model_comparison
+
+    cfg = ModelComparisonConfig.load(config)
+    result = run_model_comparison(cfg)
+    summary = result["summary"]
+    primary = f"{cfg.primary_budget:g}"
+
+    typer.echo(f"\nrun_id: {result['run_id']}   시드: {summary['seeds']}\n")
+    typer.echo(
+        f"{'model':20s} {'교정':9s} {'PR-AUC':>15s} {'Brier':>8s} {'ECE':>8s} "
+        f"{f'재현율@{primary}':>12s} {'중앙값':>8s} {'최하위':>8s} "
+        f"{'길이대비':>10s} {'이긴시드':>9s} {'폴백':>5s}"
+    )
+    typer.echo("-" * 125)
+    # 지는 후보도 그대로 인쇄합니다. 표에서 빼는 것은 선택 편향입니다.
+    for row in sorted(summary["table"], key=lambda r: -r["gain_over_word_length"]["mean"]):
+        pr = row["pr_auc"]
+        mark = "" if row["output_is_probability"] else "*"
+        typer.echo(
+            f"{row['model']:20s} {row['calibration_requested']:9s} "
+            f"{pr['mean']:6.4f}+-{pr['sd']:.4f} {row['brier']['mean']:8.4f}{mark:1s}"
+            f"{row['ece']['mean']:8.4f}{mark:1s}"
+            f"{row[f'recall_at_{primary}']['mean']:11.4f} "
+            f"{row['recall_median_listener']['mean']:8.4f} "
+            f"{row['recall_worst_listener']['mean']:8.4f} "
+            f"{row['gain_over_word_length']['mean']:+10.4f} "
+            f"{row['n_seeds_beating_word_length']:4d}/{row['n_seeds']:<4d} "
+            f"{row['n_folds_fell_back']:5d}"
+        )
+    typer.echo("\n* Brier/ECE 는 랭킹 점수라 교정 전에는 의미가 없습니다 (순위 지표만 유효).")
+
+    head = summary["headline"]
+    typer.echo(
+        f"\n모든 시드에서 단어길이를 이긴 후보: "
+        f"{head['n_candidates_beating_word_length_on_every_seed']}/{head['n_candidates']}"
+    )
+    if head["best_candidate"]:
+        b = head["best_candidate"]
+        typer.echo(
+            f"  최고: {b['model']} (교정={b['calibration_requested']}) "
+            f"길이대비 {b['gain_over_word_length']:+.4f}"
+        )
+    else:
+        # 음성 결과를 빈칸으로 남기지 않습니다. 이것도 결과입니다.
+        typer.echo("  최고: 없음 — 모든 시드에서 단어길이를 이긴 후보가 하나도 없습니다.")
+    if head["reference_logistic"]:
+        r = head["reference_logistic"]
+        typer.echo(
+            f"  참조 로지스틱: 길이대비 {r['gain_over_word_length']:+.4f} "
+            f"({r['n_seeds_beating_word_length']}개 시드에서 우세)"
+        )
+    verdict = head["best_beats_reference_logistic"]
+    typer.echo(
+        "  새 계열이 참조 기저선을 이겼는가: "
+        + ("판정 불가 (자격을 갖춘 후보 없음)" if verdict is None else str(verdict))
+    )
+    for row in summary["table"]:
+        for reason in row["fallback_reasons"]:
+            typer.echo(f"  교정 폴백 [{row['model']}/{row['calibration_requested']}]: {reason}")
+    typer.echo(f"\n단서: {head['caveat']}")
+
+
 @app.command()
 def runs() -> None:
     """List recorded experiment runs with their provenance."""

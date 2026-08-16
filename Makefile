@@ -12,7 +12,7 @@ PORT ?= 8000
 
 .DEFAULT_GOAL := help
 .PHONY: help bootstrap lock data data-verify test test-fast lint typecheck audit \
-        simulate eval eval-smoke caption-eval sensitivity reproduce run e2e \
+        simulate eval eval-smoke caption-eval sensitivity model-compare reproduce run e2e \
         figures model asr-eval smoke clean package check
 
 help: ## Show this help
@@ -95,12 +95,16 @@ caption-eval: ## RQ2/RQ3 — caption budget Pareto frontier and personalized thr
 sensitivity: ## E11 — idiosyncrasy x calibration-length sweep
 	$(PYTHON) -m audire.cli sensitivity --config experiments/configs/sensitivity.yaml
 
+model-compare: ## E22 — candidate model families and calibration methods, listener-level
+	$(PYTHON) -m audire.cli model-compare --config experiments/configs/e22_models.yaml
+
 figures: ## Regenerate every figure and table from recorded experiment artifacts
 	$(PYTHON) -m audire.cli figures --all
 
-reproduce: ## Full research reproduction: eval -> sensitivity -> figures
+reproduce: ## Full research reproduction: eval -> sensitivity -> model-compare -> figures
 	$(MAKE) eval
 	$(MAKE) sensitivity
+	$(MAKE) model-compare
 	$(MAKE) figures
 	@echo "reproduction complete; see docs/RESULTS.md and experiments/artifacts/"
 

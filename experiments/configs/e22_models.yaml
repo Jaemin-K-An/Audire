@@ -1,0 +1,45 @@
+# AUDIRE E22 — 후보 모델 계열의 청취자 수준 비교 (Phase E).
+#
+# 사전 등록 원칙은 rq1_main.yaml 과 동일합니다. 모델 목록, 시드, 예산, 주 판정 지점이
+# 여기서 고정되며 결과를 본 뒤에 고를 수 있는 것은 없습니다.
+#
+# 시뮬레이션은 합성입니다. 결과는 "추정기가 생성기가 넣어둔 구조를 회복하는가" 에 답하며,
+# "사람 청취자가 이렇게 행동한다" 에는 답하지 않습니다.
+
+name: e22_model_comparison
+description: >-
+  고정된 청취자별 자막 예산에서 개인화 모델이 단어길이 휴리스틱을 이기는지, 그리고 새
+  후보 계열(스플라인 GAM / 잔차 / LambdaMART)이 참조 로지스틱 기저선을 이기는지 비교합니다.
+
+simulation:
+  name: e22_cohort
+  # rq1_main 과 같은 다섯 시드. 모두 실행되고 편차와 함께 보고됩니다.
+  seeds: [101, 202, 303, 404, 505]
+  n_listeners: 80
+  n_calibration_trials: 100
+  n_word_trials: 250
+  snr_conditions_db: [20.0]
+  speakers: [male, female]
+
+models:
+  - logistic                 # ADR-0012 참조 기저선. 반드시 포함됩니다.
+  - phoneme_independence      # 결정론적 R_phon 비교자
+  - gradient_boosting         # 기존 비선형 비교자
+  - spline_gam                # E20
+  - residual                  # D19
+  - lambdamart                # E21 (출력은 확률이 아님)
+
+# 새 상호작용 블록을 포함한 arm. 음소 독립 기저선만 fallback_arm 으로 평가됩니다.
+arm: clinical_plus_confusion_rich
+fallback_arm: clinical_plus_confusion
+
+# 교정을 명시적 arm 으로 평가합니다. 요청과 실제 수행 방법이 폴드별로 기록됩니다.
+calibrations: [none, platt, isotonic]
+
+group_shrinkage: false
+n_splits: 5
+n_bootstrap: 200
+ece_bins: 10
+
+budgets: [0.10, 0.20, 0.30, 0.50]
+primary_budget: 0.20
