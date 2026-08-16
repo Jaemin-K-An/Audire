@@ -21,8 +21,8 @@ from audire.config.logging import get_logger
 from audire.eval.ablation import DEFAULT_CONTRASTS, ArmResult, evaluate_arm
 from audire.eval.ablation import contrast as paired_contrast
 from audire.eval.caption import compare_strategies, compare_thresholds, pareto_table
-from audire.risk.calibration import CalibrationMethod
 from audire.experiments.registry import RunRecord, finish_run, new_run, save_artifact
+from audire.risk.calibration import CalibrationMethod
 from audire.risk.features import ABLATION_ARMS
 from audire.sim.cohort import build_cohort
 from audire.sim.config import SimulationConfig
