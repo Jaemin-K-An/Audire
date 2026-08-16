@@ -1,191 +1,207 @@
-# AUDIRE Risk Register
+# AUDIRE 위험 대장
 
-Scientific, legal, engineering and ethical risks. Each entry names the risk, its impact, the
-mitigation actually implemented (with a pointer to code or a test), and the residual risk that
-survives mitigation and must therefore appear in the limitations section of any report.
+과학적·법적·공학적·윤리적 위험. 각 항목은 위험, 영향, **실제로 구현된** 완화책(코드나
+테스트 지목), 그리고 완화 후에도 남아 어떤 보고서든 한계 절에 반드시 실려야 하는
+잔여 위험을 명시합니다.
 
-Severity: **H** = would invalidate a headline claim or breach a legal/ethical obligation,
-**M** = would materially weaken a claim, **L** = quality/usability.
-
----
-
-## S1 — No participant-level Korean confusion data is available to this project · **H**
-The 72-participant response matrices behind Joo et al. (2026) and Ma et al. (2026) are not
-public. Every quantitative model in this repository is therefore fitted to **simulated**
-listeners.
-
-*Mitigation.* Two separate paths: (a) a fully synthetic research path used for power,
-sensitivity and model-recovery analysis; (b) a real calibration workflow that collects an
-individual's responses locally and builds their profile without any public participant data.
-`is_synthetic` is a required field (ADR-0009) and is propagated into every result artifact.
-
-*Residual.* **No result in this repository is clinical evidence.** RQ1–RQ3 are answered here
-*for the simulator's data-generating process*, which is an engineering and design-sensitivity
-result, not a finding about human listeners. This sentence must appear in the report.
+심각도: **H** = 핵심 주장을 무효화하거나 법적·윤리적 의무를 위반, **M** = 주장을 실질적으로
+약화, **L** = 품질·사용성.
 
 ---
 
-## S2 — Simulator assumptions could manufacture the hypothesis they are meant to test · **H**
-If synthetic word-mishearing labels are generated from the same phoneme-independence rule the
-model uses, "confusion features help" is true by construction.
+## S1 — 참여자 단위 한국어 혼동 데이터가 존재하지 않음 · **H**
+Joo et al. (2026)·Ma et al. (2026)의 72명 응답 행렬은 공개되어 있지 않습니다.
+따라서 본 저장소의 모든 정량 모델은 **시뮬레이션된** 청취자에 적합되었습니다.
 
-*Mitigation.* The generative process and the scoring model are deliberately different: the
-simulator samples perceived phonemes and derives a word label from the reconstructed form,
-optionally with position-dependent and context effects, while the learned models see only
-summarised features. A phoneme-independence *comparator* is included precisely so the gap can
-be measured. Every generative parameter lives in a config file, and a sweep over those
-parameters is part of E3/E5.
+*완화.* 두 경로를 분리했습니다. (a) 검정력·민감도·파라미터 복원 분석용 완전 합성 경로,
+(b) 개인의 응답을 로컬에서 수집해 프로파일을 만드는 실제 교정 워크플로. 공개 참여자
+데이터를 쓰지 않습니다. `is_synthetic`은 필수 필드(ADR-0009)이며 모든 결과 아티팩트로
+전파됩니다.
 
-*Residual.* A positive RQ1 result on synthetic data demonstrates that the estimator can
-recover structure the generator put there. It does not establish that human listeners carry
-that structure.
+*잔여.* **본 저장소의 어떤 결과도 임상 근거가 아닙니다.** RQ1~RQ3는 여기서 *시뮬레이터의
+데이터 생성 과정에 대해* 답해진 것이며, 이는 공학·설계 민감도 결과이지 사람 청취자에 대한
+발견이 아닙니다. 이 문장은 보고서에 반드시 실려야 합니다.
 
 ---
 
-## S3 — Listener-level leakage would inflate every metric · **H**
-Trial-level random splits put the same listener in train and test; a model could then memorise
-the listener rather than learn a transferable relationship.
+## S2 — 시뮬레이터 가정이 검정 대상 가설을 스스로 만들어낼 위험 · **H**
+합성 오청 라벨을 모델이 사용하는 것과 같은 음소 독립 규칙으로 생성하면 "혼동 특징이
+도움이 된다"는 결론이 구성상 참이 됩니다.
 
-*Mitigation.* Grouped cross-validation by listener id is the only supported split for the
-headline results; a dedicated leakage test asserts that no listener id appears on both sides
-of any fold and that a deliberately leaky split is detected.
+*완화.* 생성 과정과 채점 모델을 의도적으로 다르게 만들었습니다. 시뮬레이터는 지각 음소를
+표집해 재구성된 형태로부터 단어 라벨을 유도하며, 여기에 **오류 개수와 단어 길이에 의존하는
+어휘 복구**가 개입합니다. 음소 독립 모델은 이를 표현할 수 없습니다. 음소 독립 *비교 모델*을
+포함시켜 그 격차를 측정할 수 있게 했습니다. 모든 생성 파라미터는 설정 파일에 있고 그
+파라미터에 대한 스윕이 E3/E5의 일부입니다.
 
-*Residual.* Within-listener repeated *words* can still inflate variance estimates; bootstrap
-CIs are computed by resampling listeners, not trials.
+*잔여.* 합성 데이터에서 RQ1이 양성이라는 것은 추정기가 생성기가 넣어둔 구조를 복원할 수
+있음을 보일 뿐, 사람 청취자가 그 구조를 갖는다는 것을 확립하지 않습니다.
 
----
-
-## S4 — Probability calibration may be poor even when ranking is good · **M**
-The threshold caption policy consumes probabilities directly, so miscalibration changes how
-much text is shown.
-
-*Mitigation.* Brier score, log loss, ECE and reliability curves are reported alongside PR-AUC
-and ROC-AUC for every arm; a calibration wrapper (Platt / isotonic) is evaluated as an explicit
-arm rather than applied silently. The budget policy is provided as a calibration-free
-alternative.
-
-*Residual.* ECE is bin-count sensitive; the bin count is preregistered in the config.
+**추가 관측(2026-08-16).** 시뮬레이터의 WRS는 혼동행렬 대각원소를 결정하는 바로 그 잠재
+능력의 이항 추정치입니다. 따라서 WRS는 전역 성분에 대해 구성상 거의 충분통계량이고,
+혼동행렬이 기여할 수 있는 것은 디리클레 섭동이 만든 개별 특이 성분뿐입니다.
+**이 시뮬레이션은 본 과제의 실제 동기 가설을 검정할 수 없습니다.** `docs/RESULTS.md` §3.3.
 
 ---
 
-## S5 — A short calibration cannot support phoneme-specific claims · **H**
-A 10-item calibration touches at most 10 of 19 onsets. Estimates for unobserved phonemes are
-the prior, not evidence.
+## S3 — 청취자 수준 누출은 모든 지표를 부풀림 · **H**
+시행 단위 무작위 분할은 같은 청취자를 학습과 평가 양쪽에 넣습니다. 모델이 전이 가능한
+관계 대신 청취자를 암기할 수 있습니다.
 
-*Mitigation.* `coverage()` and `n_observations()` are first-class and surfaced in the UI;
-unobserved rows are reported by name; E5 measures the degradation curve directly. The external
-constraint from Kim et al. (2015) — WRS test-retest r falls from 0.88 (50 words) to 0.76 (25)
-to 0.61 (10), with a 95% prediction interval of ±26.22 points at 10 words — is cited as a
-ceiling on any "short test is enough" claim.
+*완화.* 핵심 결과에는 청취자 id 기준 그룹 교차검증만 허용합니다. 전용 누출 테스트가
+어떤 폴드에서도 청취자가 양쪽에 나타나지 않음을 단언하고, **의도적으로 누출되는 분할이
+탐지됨을 증명**합니다.
 
-*Residual.* AUDIRE's calibration is not KS-MWL-A and its reliability has not been measured on
-human listeners. It must never be described as a substitute for a clinical WRS.
+*잔여.* 같은 청취자 내 반복 *단어*는 여전히 분산 추정을 부풀릴 수 있습니다.
+부트스트랩 신뢰구간은 시행이 아니라 **청취자를 재표집**해 계산합니다.
 
 ---
 
-## L1 — CC BY-NC-ND 4.0 on the primary corpus · **H**
-Redistribution of modified audio, derived audio corpora, and commercial use are all prohibited;
-the card additionally asks users to notify the creator of intended use and scope.
+## S4 — 순위가 좋아도 확률 보정이 나쁠 수 있음 · **M**
+임계값 자막 정책은 확률을 직접 소비하므로, 미보정은 표시되는 텍스트 양을 바꿉니다.
 
-*Mitigation.* `data/raw/` is git-ignored; the fetcher refuses to download until
-`AUDIRE_PRIMARY_DATA_USE_NOTIFIED=1` is set by a human and states in its error message that it
-will not send the notification itself; `Source.assert_permits()` is a tripwire against adding a
-prohibited use later; `redistribution_allowed` is `False` for this source, and noise-mixing
-experiments (E8) are restricted to the CC BY-licensed corpus.
+*완화.* 모든 arm에 대해 Brier·로그손실·ECE·신뢰도 곡선을 PR-AUC·ROC-AUC와 함께
+보고합니다. 보정 래퍼(Platt/등장회귀)는 조용히 적용되지 않고 명시적 arm으로 평가됩니다.
+예산 정책은 보정이 필요 없는 대안으로 제공됩니다.
 
-*Residual.* The environment variable records only that a human asserts the step was done.
+*잔여.* ECE는 구간 수에 민감하며, 구간 수는 설정에 사전등록됩니다.
 
----
-
-## L2 — Auxiliary audiology database is not Korean phoneme ground truth · **M**
-Zenodo 17091997 is a non-Korean audiological measures database.
-
-*Mitigation.* Its registry entry prohibits "treating its speech labels as Korean
-phoneme-confusion ground truth" and the tripwire test asserts that the prohibition fires.
-
-*Residual.* Any sensitivity analysis using it must be labelled non-Korean in the report.
+**측정된 사례.** 원시 `R_phon`은 ECE 0.468로 심각하게 미보정이며 확률 임계값 정책에
+직접 투입해서는 안 됩니다(`docs/RESULTS.md` §3.4).
 
 ---
 
-## L3 — Transcribed literature values could be wrong · **M**
-Aggregate values taken from published tables (group error rates, similarity/distance means,
-test-retest coefficients) were read from journal web pages, not from the typeset PDFs.
+## S5 — 짧은 교정은 음소별 주장을 지지할 수 없음 · **H**
+10문항 교정은 초성 19개 중 최대 10개만 건드립니다. 미관측 음소의 추정치는 근거가 아니라
+사전분포입니다.
 
-*Mitigation.* Each value is stored in `data/literature/` with article, DOI, volume/issue/pages,
-URL, access date, and a `verification` field. Values are `second_verification: pending` until a
-human confirms them against the published table.
+*완화.* `coverage()`와 `n_observations()`가 1급 시민이며 UI에 노출됩니다. 미관측 행은
+이름으로 보고됩니다. E5가 저하 곡선을 직접 측정합니다. Kim et al. (2015)의 외부 제약 —
+WRS 검사–재검사 r이 50→25→10단어에서 0.88 → 0.76 → 0.61로 하락하고 10단어에서 95 %
+예측구간이 ±26.22점 — 을 "짧은 검사로 충분하다"는 어떤 주장에도 천장으로 인용합니다.
 
-*Residual.* Until second verification, these values may be used only as simulator priors and
-plausibility checks — never quoted as findings.
-
----
-
-## E1 — ASR errors could be mistaken for listener risk · **H**
-A word the ASR got wrong is not a word the listener would mishear.
-
-*Mitigation.* ADR-0010: separate fields, ranking on listener risk only, WER reported separately.
-
-*Residual.* A missing word cannot be captioned at all; deletion errors bound achievable recall
-and that bound is reported.
+*잔여.* AUDIRE의 교정은 KS-MWL-A가 아니며 그 신뢰도는 사람 청취자에서 측정된 적이
+없습니다. 임상 WRS의 대체물로 기술되어서는 안 됩니다.
 
 ---
 
-## E2 — Word timestamp quality · **M**
-Selective captioning needs word-level timing; word timestamps are estimated, not exact.
+## L1 — 1차 코퍼스의 CC BY-NC-ND 4.0 · **H**
+변형 음원 재배포, 파생 음성 코퍼스, 상업적 이용이 모두 금지되며, 카드는 사용 목적·범위를
+제작자에게 통보할 것을 추가로 요청합니다.
 
-*Mitigation.* The adapter records per-word timing and confidence; exports are validated for
-monotonic non-overlapping cues; a timing-jitter sensitivity check is part of E7.
+*완화.* `data/raw/`는 git 무시 대상입니다. 페처는 사람이 `AUDIRE_PRIMARY_DATA_USE_NOTIFIED=1`을
+설정할 때까지 다운로드를 거부하며, **통보를 대신 보내지 않는다는 사실을 에러 메시지에
+명시**합니다. `Source.assert_permits()`가 이후 금지 용도 추가를 막는 지뢰선입니다.
+이 출처의 `redistribution_allowed`는 `False`이고, 잡음 혼합 실험(E8)은 CC BY 코퍼스로
+제한됩니다.
 
----
-
-## E3 — Model/backend substitution breaking reproducibility · **M**
-*Mitigation.* The ASR adapter is an interface with a recorded backend name, model id and
-revision written into every result artifact; the deterministic CI path uses a pinned fixture
-and does not require downloading weights.
-
----
-
-## P1 — Private hearing data · **H**
-Audiograms, SRT/WRS values and trial responses are sensitive.
-
-*Mitigation.* Real profiles are written only under a git-ignored `private/` directory; the repo
-contains schemas and synthetic examples only; `.gitignore` blocks `private/`, `*.participant.*`
-and `profiles_local/`; explicit export and delete operations are part of the API surface.
-
-*Residual.* A user can still choose to place a profile elsewhere; the UI states where data is
-stored.
+*잔여.* 환경 변수는 사람이 그 단계를 수행했다고 **주장**한다는 사실만 기록합니다.
 
 ---
 
-## P2 — Participant recruitment and ethics · **H** (blocking, unresolved)
-If human listeners are recruited, institutional/school ethics approval and informed consent are
-required first.
+## L2 — 보조 청각학 데이터베이스는 한국어 음소 정답이 아님 · **M**
+Zenodo 17091997은 비한국어 청각학 측정 데이터베이스입니다.
 
-*Status.* **Not obtained. No human participant data has been collected in this repository.**
-This is a genuine external blocker: it cannot be resolved by the software. Everything that does
-not depend on it has been built.
+*완화.* 레지스트리 항목이 "그 어음 라벨을 한국어 음소 혼동 정답으로 취급"을 금지하고,
+지뢰선 테스트가 그 금지의 발동을 단언합니다.
 
----
-
-## P3 — Misinterpretation as a diagnostic tool · **H**
-Displaying PTA/SRT/WRS next to a risk score invites a diagnostic reading.
-
-*Mitigation.* The package docstring, the UI and every export state that AUDIRE is research and
-accessibility software and not a medical device; no output is phrased as a diagnosis, degree of
-loss, or treatment recommendation.
+*잔여.* 이를 사용한 어떤 민감도 분석도 보고서에 **비한국어**로 표기되어야 합니다.
 
 ---
 
-## X1 — One expert is not a panel · **M**
-*Mitigation.* `docs/EXPERT_PROTOCOL.md` forbids describing the review as consensus, Delphi or
-clinical validation, and requires disagreements to be preserved.
+## L3 — 전사한 문헌 값이 틀릴 수 있음 · **M**
+출판된 표에서 가져온 집계값(군별 오류율, 유사도·거리 평균, 검사–재검사 계수)은 조판된
+PDF가 아니라 저널 웹페이지에서 읽었습니다.
 
-*Status.* The expert instruments are prepared; **no expert review has been conducted.**
-Reporting any expert result before it happens would be fabrication.
+*완화.* 각 값은 논문·DOI·권호쪽·URL·접근일·`verification` 필드와 함께
+`data/literature/`에 저장됩니다. 사람이 출판된 표와 대조 확인하기 전까지는
+`second_verification: pending`입니다.
+
+*잔여.* 2차 검증 전까지 이 값들은 시뮬레이터 사전분포와 타당성 검사에만 쓸 수 있으며
+**발견으로 인용될 수 없습니다.**
 
 ---
 
-## X2 — Cherry-picking seeds or operating points · **M**
-*Mitigation.* Configs declare seed *lists*; the runner executes all of them and reports
-distributions with CIs; caption results are reported as a full Pareto frontier across
-10/20/30/40/50 % budgets rather than a single chosen threshold.
+## E1 — ASR 오류가 청취자 위험으로 오인될 위험 · **H**
+ASR이 틀린 단어는 청취자가 오청할 단어가 아닙니다.
+
+*완화.* ADR-0010: 별개 필드, 청취자 위험으로만 순위 결정, WER 별도 보고.
+ASR 신뢰도로 표시된 단어는 구별되는 결정값을 받아 개인화 적중으로 계산될 수 없습니다.
+
+*잔여.* 누락된 단어는 자막을 붙일 수조차 없습니다. 삭제 오류가 달성 가능한 재현율의
+상한을 정하며 그 상한을 보고합니다.
+
+---
+
+## E2 — 단어 타임스탬프 품질 · **M**
+선택 자막에는 단어 단위 타이밍이 필요한데, 단어 타임스탬프는 추정치이지 정확값이 아닙니다.
+
+*완화.* 어댑터가 단어별 타이밍과 신뢰도를 기록하고, `Transcript.timing_problems()`가
+중첩·비단조 타임스탬프를 **삼키지 않고 노출**합니다. 내보내기는 단조·비중첩 큐를 검증합니다.
+타이밍 지터 민감도 검사가 E7의 일부입니다.
+
+---
+
+## E3 — 모델·백엔드 교체로 인한 재현성 손실 · **M**
+*완화.* ASR 어댑터는 백엔드 이름·모델 id·리비전이 모든 결과 아티팩트에 기록되는
+인터페이스입니다. 결정론적 CI 경로는 고정 픽스처를 쓰고 가중치 다운로드를 요구하지 않으며,
+리플레이 결과는 **원래 인식기의 정체성을 보존**해 새 인식이라고 주장할 수 없습니다.
+
+---
+
+## P1 — 비공개 청력 데이터 · **H**
+청력도·SRT/WRS·시행 응답은 민감 정보입니다.
+
+*완화.* 실제 프로파일은 git 무시되는 `private/` 아래에만 기록됩니다. 저장소에는 스키마와
+합성 예시만 존재합니다. `.gitignore`가 `private/`·`*.participant.*`·`profiles_local/`를
+차단하고, 명시적 내보내기·삭제 연산이 API 표면의 일부입니다. 청취자 id는
+`[A-Za-z0-9._-]`로 제한되어 **검증기가 이름을 거부**합니다.
+
+*잔여.* 사용자가 프로파일을 다른 곳에 둘 수는 있습니다. UI가 저장 위치를 명시합니다.
+
+---
+
+## P2 — 참여자 모집과 연구윤리 · **H** (차단, 미해결)
+사람 청취자를 모집한다면 기관/학교 IRB 승인과 사전 동의가 먼저 필요합니다.
+
+*상태.* **미획득. 본 저장소에서 사람 참여자 데이터는 수집되지 않았습니다.**
+이는 소프트웨어로 해결할 수 없는 진짜 외부 차단 요인입니다. 여기에 의존하지 않는 모든
+것을 구현했습니다.
+
+---
+
+## P3 — 진단 도구로 오해될 위험 · **H**
+PTA·SRT·WRS를 위험 점수 옆에 표시하면 진단적 해석을 유발합니다.
+
+*완화.* 패키지 독스트링·UI·모든 내보내기가 AUDIRE는 연구·접근성 소프트웨어이며
+의료기기가 아님을 명시합니다. 어떤 출력도 진단·난청 정도·치료 권고로 표현되지 않습니다.
+중증도 계층은 명명·인용된 체계에 따른 **기술적 라벨**이며 그렇게 문서화됩니다.
+
+---
+
+## X1 — 전문가 1인은 패널이 아님 · **M**
+*완화.* `docs/EXPERT_PROTOCOL.md`가 그 검토를 합의·델파이·임상 검증으로 기술하는 것을
+금지하고 이견 보존을 요구합니다.
+
+*상태.* 도구는 준비되었으나 **전문가 검토는 시행되지 않았습니다.** 시행 전에 전문가 결과를
+보고하는 것은 날조입니다.
+
+---
+
+## X2 — 시드나 운영점 체리피킹 · **M**
+*완화.* 설정이 시드 *목록*을 선언하고 실행기가 전부 실행하며 분포와 신뢰구간을 보고합니다.
+자막 결과는 단일 선택 임계값이 아니라 10/20/30/40/50 % 예산 전체의 파레토 프런티어로
+보고됩니다.
+
+---
+
+## X3 — 총합 지표가 형평성 실패를 은폐 · **M** (2026-08-16 추가)
+총합 오청 재현율은 소수 고위험 청취자에게 자막을 몰아주는 것으로 최대화될 수 있습니다.
+
+*측정된 사례.* 통합 예산에서 임상 특징을 쓰면 총합 재현율이 0.259 → 0.411로 오르지만
+**최하위 청취자의 재현율은 0.000**이 됩니다. 전역 임계값에서는 청취자 절반의 재현율
+중앙값이 0.000입니다.
+
+*완화.* `recall_by_listener()`가 청취자별 분포를 반환하고, 모든 파레토 표에 최소·중앙값·
+최대가 실립니다. 통합 전략이 개별 청취자를 굶길 수 있음을 테스트가 검증합니다.
+연구 계획의 1차 지표가 불충분하다는 사실을 `docs/RESULTS.md` §4에 발견으로 기록했습니다.

@@ -1,48 +1,48 @@
 # AUDIRE
 
-**Personalized Prediction of Korean Word Misrecognition for Selective Captioning**
-개인 어음인지 프로파일 기반 한국어 오청 예측 및 선택 자막
+**개인 어음인지 프로파일 기반 한국어 오청 예측 및 선택 자막**
+Personalized Prediction of Korean Word Misrecognition for Selective Captioning
 
-AUDIRE estimates, for a specific listener, the probability that a specific Korean word will be
-misheard —
+AUDIRE는 특정 청취자가 특정 한국어 단어를 잘못 들을 확률을
 
 ```
-P(word misheard | listener, word, acoustic context)
+P(단어 오청 | 청취자, 단어, 음향 맥락)
 ```
 
-— from a personalized speech-perception profile (audiogram/PTA, SRT, WRS, optionally
-PBmax/MCL/UCL, and an individual onset/nucleus/coda phoneme confusion matrix), and uses that
-probability to caption only the words that need captioning.
+개인 어음인지 프로파일(순음청력도/PTA, SRT, WRS, 선택적으로 PBmax·MCL·UCL, 그리고
+개인별 초성·중성·종성 음소 혼동행렬)로부터 추정하고, 그 확률을 이용해 **자막이 필요한
+단어만** 표시합니다.
 
-The central hypothesis is that **WRS and the confusion matrix carry different information**:
-WRS says how much speech a listener misrecognizes globally, the confusion matrix says what
-they confuse locally. AUDIRE keeps them structurally separate so that the question can be
-tested rather than assumed.
+핵심 가설은 **WRS와 혼동행렬이 서로 다른 정보를 담는다**는 것입니다.
+WRS는 청취자가 말소리를 얼마나 *전역적으로* 오인지하는지를, 혼동행렬은 무엇을
+*국소적으로* 혼동하는지를 말합니다. AUDIRE는 이 둘을 구조적으로 분리해 두어, 가정하는
+대신 검정할 수 있게 합니다.
 
-> **AUDIRE is research and accessibility software. It is not a medical device.** It does not
-> diagnose hearing loss and does not recommend treatment.
+> **AUDIRE는 연구·접근성 소프트웨어이며 의료기기가 아닙니다.**
+> 난청을 진단하지 않고 치료를 권고하지 않습니다.
 
 ---
 
-## Status
+## 현재 상태
 
-| Gate | Scope | Status |
+| 게이트 | 범위 | 상태 |
 |---|---|---|
-| G0 | Evidence, licences, provenance, data layer | complete |
-| G1 | Hangul engine, response parser, confusion matrices | complete |
-| G2 | HearingProfile + synthetic simulation | complete |
-| G3 | Risk models, calibration, listener-level evaluation | complete |
-| G4 | Selective caption engine + exports | complete |
-| G5 | ASR adapter + end-to-end pipeline | complete (real weights not yet run here) |
-| G6 | Complete user system (API + web) | **not started** |
-| G7 | Validation and sensitivity | partial — key sweeps not run |
-| G8 | Reproducible release | partial — `make reproduce` chain incomplete |
+| G0 | 근거·라이선스·출처·데이터 계층 | 완료 |
+| G1 | 한글 엔진, 응답 파서, 혼동행렬 | 완료 |
+| G2 | HearingProfile + 합성 시뮬레이션 | 완료 |
+| G3 | 위험 모델, 보정, 청취자 수준 평가 | 완료 |
+| G4 | 선택 자막 엔진 + 내보내기 | 완료 |
+| G5 | ASR 어댑터 + 종단 파이프라인 | 코드 완료 (실제 가중치로는 미실행) |
+| G6 | 완성된 사용자 시스템 (API + 웹) | **미착수** |
+| G7 | 검증·민감도 | 부분 — 핵심 스윕 미실행 |
+| G8 | 재현 가능한 릴리스 | 부분 — `make reproduce` 체인 미완성 |
 
-`docs/TASKS.md` is the live ledger. No gate below G8 may be described as a finished product.
+`docs/TASKS.md`가 실시간 작업 대장입니다. **G8 미만의 어떤 게이트도 "완성된 제품"으로
+기술될 수 없습니다.**
 
 ---
 
-## Quick start
+## 빠른 시작
 
 ```bash
 make bootstrap
@@ -56,96 +56,126 @@ make test
 make data
 ```
 
-`make data` fetches every source that does not require an outstanding human step. The primary
-Korean monosyllable corpus is **CC BY-NC-ND 4.0** and its dataset card asks users to inform the
-creator of their intended use and scope before using it. AUDIRE will not send that message for
-you; after you have handled it yourself:
+`make data`는 사람의 개입이 필요 없는 모든 출처를 내려받습니다.
+1차 한국어 단음절 코퍼스는 **CC BY-NC-ND 4.0**이며, 데이터셋 카드가 사용 전에 제작자에게
+사용 목적과 범위를 알릴 것을 요청합니다. **AUDIRE는 그 연락을 대신 보내지 않습니다.**
+직접 처리하신 후:
 
 ```bash
 AUDIRE_PRIMARY_DATA_USE_NOTIFIED=1 make data-primary
 ```
 
-AUDIRE works without that corpus — see *Stimulus sources* below.
+이 코퍼스가 없어도 AUDIRE는 동작합니다 — 아래 *자극 출처* 참조.
 
 ---
 
-## Repository map
+## 저장소 구조
 
 ```
 src/audire/
-  hangul/       modern-Hangul decomposition/recomposition, jamo inventories
-  confusion/    response parsing, error taxonomy, per-position confusion matrices
-  profile/      HearingProfile schema (PTA/SRT/WRS/PBmax/MCL/UCL) with explicit missingness
-  risk/         baselines, learned probabilistic models, probability calibration
-  asr/          replaceable Korean ASR adapter with word timestamps
-  caption/      risk ranking, threshold/budget policies, SRT/ASS/JSON export
-  sim/          synthetic listener and trial generators (every row is_synthetic=true)
-  eval/         metrics, bootstrap CIs, ablations, figures
-  data/         source registry, fetchers, manifests, stimulus catalogues
-apps/api/       FastAPI application            (G6 — NOT YET IMPLEMENTED)
-apps/web/       browser client                 (G6 — NOT YET IMPLEMENTED)
-experiments/    preregistered configs; artifacts are regenerated, never committed
-data/manifests/ provenance for every acquired byte
-docs/           research plan, decisions, risks, claims, results
+  hangul/       현대 한글 분해/조합, 자모 목록
+  confusion/    응답 파싱, 오류 분류체계, 위치별 혼동행렬
+  profile/      HearingProfile 스키마(PTA/SRT/WRS/PBmax/MCL/UCL), 명시적 결측 처리
+  risk/         베이스라인, 학습 확률 모델, 확률 보정
+  asr/          교체 가능한 한국어 ASR 어댑터(단어 타임스탬프 포함)
+  caption/      위험 순위, 임계값/예산 정책, SRT/ASS/JSON 내보내기
+  sim/          합성 청취자·시행 생성기 (모든 행에 is_synthetic=true)
+  eval/         지표, 부트스트랩 신뢰구간, 절제 실험, 그림
+  data/         출처 레지스트리, 페처, 매니페스트, 자극 목록
+  experiments/  실험 설정, 실행 출처 레지스트리, 그림 재생성
+apps/api/       FastAPI 애플리케이션            (G6 — 아직 미구현)
+apps/web/       브라우저 클라이언트            (G6 — 아직 미구현)
+experiments/    사전등록 설정. 아티팩트는 재생성되며 커밋하지 않음
+data/manifests/ 취득한 모든 바이트의 출처 기록
+docs/           연구 계획, 결정 기록, 위험 대장, 결과
 ```
 
 ---
 
-## Stimulus sources
+## 자극 출처
 
-Calibration needs Korean monosyllables. Two sources are supported and the system is fully
-functional with either:
+교정에는 한국어 단음절이 필요합니다. 두 가지 출처를 지원하며 어느 쪽으로도 완전히
+동작합니다.
 
-**`builtin`** — a deterministic phoneme-balanced design generated from the Hangul inventory
-itself: 19 onsets × 21 nuclei × 8 coda categories = 3,192 combinations, enumerated in a coprime
-cyclic order so the first *k* items are the balanced *k*-item calibration list. No third-party
-licence. The browser speaks the syllables with its Korean speech synthesiser, which is **not
-level-calibrated** — usable for research and accessibility, never for clinical measurement.
+**`builtin`** — 한글 자모 목록 자체에서 생성한 결정론적 음소 균형 설계.
+초성 19 × 중성 21 × 종성 8범주 = **3,192 조합**을 서로소 순환 순서로 열거하므로,
+앞에서 *k*개를 자르면 그것이 곧 균형 잡힌 *k*문항 교정 목록이 됩니다. 제3자 라이선스가
+없습니다. 브라우저의 한국어 음성합성으로 재생하는데, 이는 **음압 교정이 되어 있지
+않으므로** 연구·접근성 용도로만 쓸 수 있고 임상 측정에는 부적합합니다.
 
-**`kmsp`** — the Korean Monosyllabic Speech Perception Test Dataset: 726 recorded utterances,
-2 speakers, 16 kHz, with duration/pitch/formant metadata. Preferred when available. Neither its
-audio nor its metadata is ever committed or redistributed (ND clause).
-
----
-
-## Data, privacy and licences
-
-* `data/raw/`, `data/processed/` and `private/` are git-ignored. **No participant-level
-  audiogram, SRT, WRS or trial response may ever be committed.**
-* Every acquired dataset gets a manifest in `data/manifests/` with a SHA-256 per file, the
-  pinned revision, the licence and the retrieval time. `make data-verify` re-checks them.
-* Every source in `data/sources.yaml` declares its permitted and prohibited uses, and
-  `Source.assert_permits()` is a tripwire against adding a prohibited use later.
-* Licences were read from the live source APIs on 2026-08-16, not from prose — including two
-  documented discrepancies (see `docs/DECISIONS.md` ADR-0003).
+**`kmsp`** — 한국어 단음절 말지각검사 데이터셋: 726개 녹음 발화, 화자 2명, 16 kHz,
+지속시간·피치·포먼트 메타데이터 포함. 사용 가능하면 이쪽이 우선입니다. 음원과 메타데이터
+모두 커밋·재배포하지 않습니다(ND 조항).
 
 ---
 
-## Reproducibility
+## 데이터·프라이버시·라이선스
+
+* `data/raw/`, `data/processed/`, `private/`는 git 추적에서 제외됩니다.
+  **참여자 단위 청력도·SRT·WRS·응답은 절대 커밋될 수 없습니다.**
+* 취득한 모든 데이터셋은 `data/manifests/`에 파일별 SHA-256, 고정 리비전, 라이선스,
+  취득 시각과 함께 매니페스트를 남깁니다. `make data-verify`로 재검증합니다.
+* `data/sources.yaml`의 모든 출처가 허용/금지 용도를 선언하며,
+  `Source.assert_permits()`가 이후에 금지 용도가 추가되는 것을 막는 지뢰선입니다.
+* 라이선스는 문서의 산문이 아니라 **2026-08-16에 각 출처의 라이브 API에서 직접 확인**
+  했습니다. 두 건의 불일치를 발견해 기록했습니다(`docs/DECISIONS.md` ADR-0003).
+
+---
+
+## 재현성
 
 ```bash
-make eval      # preregistered ablation + caption + threshold studies, all seeds
-make figures   # regenerate every table and figure from the recorded artifacts alone
+make eval      # 사전등록된 절제·자막·임계값 연구를 모든 시드에 대해 실행
+make figures   # 기록된 아티팩트만으로 모든 표와 그림을 재생성
 ```
 
-Every run records its git SHA, a **git-dirty flag**, the config, the seed list, the dependency
-lock hash, the data-manifest content digests, the metrics and the artifact paths into
-`experiments/registry.yaml`, so every reported number traces to the bytes and code that
-produced it. Failed runs are recorded too.
+모든 실행은 git SHA, **git 더티 플래그**, 설정, 시드 목록, 의존성 락 해시,
+데이터 매니페스트 콘텐츠 다이제스트, 지표, 아티팩트 경로를 `experiments/registry.yaml`에
+기록합니다. 따라서 보고된 모든 수치는 그것을 만들어낸 바이트와 코드까지 추적됩니다.
+**실패한 실행도 기록**되므로 레지스트리에 조용한 공백이 생기지 않습니다.
 
-`make reproduce` additionally calls a `sensitivity` target that is **not yet implemented** —
-see `docs/TASKS.md`.
+`make reproduce`는 추가로 `sensitivity` 타깃을 호출하는데 이는 **아직 미구현**입니다 —
+`docs/TASKS.md` 참조.
 
 ---
 
-## Reading order
+## 주요 결과 요약 (합성 데이터)
 
-1. `AGENTS.md` — the execution contract
-2. `docs/RESEARCH_PLAN.md` — questions, hypotheses, falsification criteria
-3. `docs/DECISIONS.md` — why the system is built the way it is
-4. `docs/RISK_REGISTER.md` — what could invalidate the claims
-5. `docs/RESULTS.md` — only reproduced numbers, including negative results
+> 아래 수치는 모두 **합성 데이터** 결과이며 사람 청취자에 대한 근거가 아닙니다.
 
-## Licence
+| 연구 질문 | 답 |
+|---|---|
+| RQ1 개인 혼동행렬이 예측을 개선하는가 | **예, 그러나 작게.** PTA+SRT+WRS 대비 ΔPR-AUC +0.006 [0.002, 0.010] |
+| 비선형 모델이 필요한가 | **아니오.** 그래디언트 부스팅이 로지스틱 회귀를 이기지 못함 (0.655 vs 0.667) |
+| `R_phon`을 확률로 쓸 수 있는가 | **아니오.** 순위는 양호(PR-AUC 0.64)하나 심각한 미보정(ECE 0.47) |
+| RQ2 동일 예산에서 개인화가 이기는가 | **아니오.** 무작위는 이기나 단어길이 휴리스틱을 못 이김 |
+| RQ3 개인화 임계값이 나은가 | **총합 재현율에서는 아니오, 형평성에서는 예.** 전역 임계값은 청취자 절반에게 자막을 거의 주지 않음 |
 
-Apache-2.0 for the code. Third-party data retains its own licence; see `data/sources.yaml`.
+사전등록된 반증 조건 4개 중 **2개가 부분적으로 발동**했습니다. 자세한 내용과 단서는
+`docs/RESULTS.md`에 있습니다.
+
+---
+
+## 외부 차단 요인 (소프트웨어로 해결 불가)
+
+| ID | 차단 요인 | 필요한 조치 |
+|---|---|---|
+| B1 | 사람 참여자 데이터 | 수집 **이전에** 기관/학교 IRB 승인과 사전 동의 필요. 미획득·미수집. |
+| B2 | 1차 코퍼스 통보 | 데이터셋 카드가 제작자(Woojae Han)에게 사용 목적·범위 통보를 요청. 사람이 직접 수행 후 `AUDIRE_PRIMARY_DATA_USE_NOTIFIED=1` 설정. AUDIRE는 대신 보내지 않음. |
+| B3 | 전문가 검토 | 청각 전문가의 시간과 자격 공개 동의 필요. 프로토콜은 `docs/EXPERT_PROTOCOL.md`에 준비 완료. |
+
+---
+
+## 읽는 순서
+
+1. `AGENTS.md` — 실행 계약
+2. `docs/RESEARCH_PLAN.md` — 연구 질문, 가설, 반증 조건
+3. `docs/DECISIONS.md` — 왜 이렇게 만들었는가 (ADR)
+4. `docs/RISK_REGISTER.md` — 무엇이 주장을 무효화할 수 있는가
+5. `docs/RESULTS.md` — 재현된 수치만, **음성 결과 포함**
+
+---
+
+## 라이선스
+
+코드는 Apache-2.0. 제3자 데이터는 각자의 라이선스를 유지합니다 — `data/sources.yaml` 참조.

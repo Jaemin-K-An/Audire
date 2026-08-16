@@ -1,176 +1,208 @@
-# Architecture and Method Decision Records
+# 아키텍처 및 방법론 결정 기록 (ADR)
 
-ADR-style. Each record states the decision, why, what was rejected, and how the decision
-can be falsified or revisited. Decisions that affect a scientific claim also name the
-test or experiment that would expose them as wrong.
-
----
-
-## ADR-0001 — Python 3.12 with a source layout, pinned versions and a lockfile
-**Status:** accepted (2026-08-16)
-
-**Context.** The host machine's default interpreter is 3.9.13, but the current releases of
-numpy (2.5.2), scipy (1.18.0) and librosa require ≥3.12, and pandas/scikit-learn/matplotlib
-require ≥3.11. Python 3.12.9 is available via Homebrew.
-
-**Decision.** Target `>=3.12,<3.14`. Use a `src/` layout so tests import the installed
-package rather than the working tree. Pin exact versions in `pyproject.toml` and freeze a
-`requirements.lock`.
-
-**Rejected.** Supporting 3.9 — it would force old numpy/scipy and defeat the reproducibility
-goal.
-
-**Revisit if** a required dependency drops 3.12 support.
+각 기록은 결정, 이유, 기각한 대안, 그리고 이 결정이 틀렸음을 어떻게 드러낼 수 있는지를
+명시합니다. 과학적 주장에 영향을 주는 결정은 그것을 반증할 테스트나 실험을 함께 지목합니다.
 
 ---
 
-## ADR-0002 — Dependency versions verified against PyPI before pinning
-**Status:** accepted (2026-08-16)
+## ADR-0001 — 소스 레이아웃·버전 고정·락파일을 갖춘 Python 3.12
+**상태:** 채택 (2026-08-16)
 
-**Context.** `AGENTS.md` §"Verify current official documentation … before pinning".
+**맥락.** 호스트 기본 인터프리터는 3.9.13이지만, numpy(2.5.2)·scipy(1.18.0)·librosa 현행
+릴리스는 3.12 이상을, pandas·scikit-learn·matplotlib은 3.11 이상을 요구합니다.
+Homebrew로 Python 3.12.9를 사용할 수 있습니다.
 
-**Decision.** Every pinned version in `pyproject.toml` was read from the live PyPI JSON API
-on 2026-08-16, not from memory. `faster-whisper` 1.2.1 was confirmed to exist and to support
-Python ≥3.9 before being made the default ASR backend candidate.
+**결정.** `>=3.12,<3.14`를 타깃으로 합니다. 테스트가 작업 트리가 아니라 설치된 패키지를
+임포트하도록 `src/` 레이아웃을 씁니다. `pyproject.toml`에 정확한 버전을 고정하고
+`requirements.lock`을 동결합니다.
 
-**Consequence.** Re-verification is required before any version bump; `make audit` runs a
-vulnerability check.
+**기각.** 3.9 지원 — 구버전 numpy/scipy를 강제해 재현성 목표를 무력화합니다.
 
----
-
-## ADR-0003 — External data provenance is verified from live source APIs, not from prose
-**Status:** accepted (2026-08-16)
-
-**Context.** `docs/DATA_REGISTRY.md` asserts licences and row counts. Prose can drift from
-reality.
-
-**Decision.** Before writing `data/sources.yaml`, each source's live metadata API was queried
-and the registry records what was actually observed, including two discrepancies:
-
-1. **The primary corpus's metadata file is `metadata.csv`, not `updated_metadata.csv`.**
-   The dataset card's prose names the latter; the repository's real file listing (729 entries:
-   `.gitattributes`, `README.md`, `metadata.csv`, and 726 `audio_files/*.wav`) contains only
-   the former. The registry pins the real name and the code reads it from the registry.
-2. **The Zeroth-Korean mirror has no machine-readable `license` front-matter field.**
-   `cardData.license` is absent. CC BY 4.0 is stated in the card *body* and by upstream
-   OpenSLR SLR40. The registry records the licence together with the fact that the
-   machine-readable tag is missing, so the claim is auditable.
-
-**Consequence.** `data/sources.yaml` carries a `verified_at` date per source and
-`_fetch_zeroth`/`_fetch_zenodo` re-check the live licence at download time; a Zenodo licence
-change is a hard error rather than a silent inheritance.
+**재검토 조건:** 필수 의존성이 3.12 지원을 중단할 때.
 
 ---
 
-## ADR-0004 — Full orthographic jamo inventories, not the literature's reduced inventories
-**Status:** accepted (2026-08-16)
+## ADR-0002 — 버전 고정 전 PyPI 대조 검증
+**상태:** 채택 (2026-08-16)
 
-**Context.** Ma et al. (2026, DOI 10.21848/asr.250216) analyse 18 onsets, 16 nuclei and 8
-codas. AUDIRE must score arbitrary Korean caption text, not only their stimulus set.
+**맥락.** `AGENTS.md`의 "고정 전 현행 공식 문서 확인" 요구.
 
-**Decision.** Confusion matrices use the complete modern orthographic inventory: 19 onsets
-(including the null onset `ㅇ`), 21 nuclei, and 27 codas plus an explicit `NO_CODA`
-category. `audire.confusion.grouping` provides the phonological mapping down to the
-7-way neutralised coda set when a comparison to published tables is required.
+**결정.** `pyproject.toml`의 모든 고정 버전은 기억이 아니라 2026-08-16 라이브 PyPI JSON
+API에서 읽었습니다. `faster-whisper` 1.2.1이 실재하고 Python 3.9 이상을 지원함을 확인한
+뒤에야 기본 ASR 백엔드 후보로 삼았습니다.
 
-**Consistency check.** 19 onsets − the null onset = **18**, matching Ma et al.'s onset count;
-7 neutralised surface codas + `NO_CODA` = **8**, matching their coda count. Their nucleus
-count of 16 is not reconstructible from the material available to this project and is
-recorded as an open question in `docs/RESULTS.md` rather than guessed at.
-
-**Falsifiable by** any evidence that a reduced inventory predicts held-out mishearing better;
-`with_smoothing`/`grouping` make that ablation cheap to run.
+**귀결.** 버전 상향 전 재검증이 필수이며, `make audit`가 취약점 검사를 수행합니다.
 
 ---
 
-## ADR-0005 — Independent error taxonomy, explicitly not a reimplementation
-**Status:** accepted (2026-08-16)
+## ADR-0003 — 외부 데이터 출처는 산문이 아니라 라이브 API에서 검증
+**상태:** 채택 (2026-08-16)
 
-**Context.** Joo et al. (2026) code errors into 10 categories. The coding manual is not
-available to this project.
+**맥락.** `docs/DATA_REGISTRY.md`가 라이선스와 행 수를 서술합니다. 산문은 현실과 어긋날 수
+있습니다.
 
-**Decision.** AUDIRE defines its own taxonomy (correct / substitution / omission / addition /
-compound / no-response) directly from the orthographic decomposition, and documents that its
-counts are **not** interchangeable with that paper's. `ㅇ` in onset position is the
-phonologically null onset, so `ㄱ→ㅇ` is an omission and `ㅇ→ㄱ` an addition; coda omission and
-addition are ordinary `NO_CODA` transitions.
+**결정.** `data/sources.yaml` 작성 전에 각 출처의 라이브 메타데이터 API를 조회하고,
+**실제로 관측한 값**을 기록했습니다. 다음 두 건의 불일치를 포함합니다.
 
-**Consequence.** No AUDIRE output may be presented as reproducing a published error-rate table.
+1. **1차 코퍼스의 메타데이터 파일은 `updated_metadata.csv`가 아니라 `metadata.csv`입니다.**
+   데이터셋 카드 산문은 전자를 지칭하나, 저장소의 실제 파일 목록(729개: `.gitattributes`,
+   `README.md`, `metadata.csv`, `audio_files/*.wav` 726개)에는 후자만 존재합니다.
+   레지스트리가 실제 이름을 고정하고 코드는 레지스트리에서 읽습니다.
+2. **Zeroth-Korean 미러에 기계 판독 가능한 `license` 필드가 없습니다.**
+   `cardData.license`가 부재합니다. CC BY 4.0은 카드 *본문*과 상위 OpenSLR SLR40에
+   명시되어 있습니다. 레지스트리는 라이선스와 함께 **기계 판독 태그가 없다는 사실**을
+   기록해 감사 가능하게 합니다.
 
----
-
-## ADR-0006 — Dirichlet posterior-mean smoothing with an explicit, serialisable prior
-**Status:** accepted (2026-08-16)
-
-**Context.** A 25-item calibration cannot observe most of a 19×20 onset matrix. Unsmoothed
-rows are degenerate (0 or 1) and unobserved rows are undefined.
-
-**Decision.** Estimate row *i* as `(n_ij + α·π_ij) / (n_i + α)` with `α` a total pseudo-count
-and `π_i` an explicit row-stochastic prior. Default `α = 1.0` with a uniform prior. When a
-group profile exists, `SmoothingSpec(kind="explicit", prior=group)` performs hierarchical
-shrinkage toward the group.
-
-**Rejected.** Add-one-per-cell Laplace — with 20–28 columns it injects 20–28 pseudo-counts and
-would swamp a 25-trial calibration.
-
-**Guardrails.** `α = 0` with an unobserved row raises rather than returning `NaN`; counts are
-never discarded, so `p_correct` and `n_observations` are always both available; unobserved rows
-are reported by `unobserved_targets` and `coverage`.
+**귀결.** `data/sources.yaml`은 출처별 `verified_at` 날짜를 갖고, Zenodo 페처는 다운로드
+시점에 라이브 라이선스를 재확인합니다. 라이선스 변경은 조용한 승계가 아니라 **하드 에러**입니다.
 
 ---
 
-## ADR-0007 — The system must work without the licence-gated primary corpus
-**Status:** accepted (2026-08-16)
+## ADR-0004 — 문헌의 축소 목록이 아닌 정서법상 전체 자모 목록 사용
+**상태:** 채택 (2026-08-16)
 
-**Context.** The primary corpus is CC BY-NC-ND 4.0 and its card asks users to notify the
-creator before use. That is a human step AUDIRE must not automate, so a fresh evaluator may
-not have the audio.
+**맥락.** Ma et al. (2026, DOI 10.21848/asr.250216)은 초성 18·중성 16·종성 8을 분석합니다.
+AUDIRE는 그들의 자극 집합이 아니라 임의의 한국어 자막 텍스트를 채점해야 합니다.
 
-**Decision.** Ship a second stimulus source: a deterministic phoneme-balanced monosyllable
-design generated from the Hangul inventory itself (19 × 21 × 8 = 3,192 combinations, visited
-in a coprime cyclic order so that the first *k* items are the balanced *k*-item list). It
-carries no third-party licence. The web client speaks it with the browser's Korean speech
-synthesiser.
+**결정.** 혼동행렬은 현대 정서법 전체 목록을 사용합니다: 초성 19(무음 초성 `ㅇ` 포함),
+중성 21, 종성 27 + 명시적 `NO_CODA` 범주. `audire.confusion.grouping`이 출판된 표와
+비교할 때 필요한 7종성 중화 매핑을 제공합니다.
 
-**Stated limitation, carried into every report.** Browser TTS is **not level-calibrated**.
-Calibration performed with it is a research/accessibility measurement, never a clinical one.
-Recorded corpus audio remains the preferred source when the human step has been completed.
+**일관성 검사.** 초성 19 − 무음 초성 = **18**로 Ma et al.의 초성 수와 일치.
+중화된 표면 종성 7 + `NO_CODA` = **8**로 그들의 종성 수와 일치. 중성 16이라는 수치는
+본 과제가 접근 가능한 자료로는 재구성할 수 없어, 추측 대신 `docs/RESULTS.md`에 미해결로
+기록합니다.
 
----
-
-## ADR-0008 — Confusion profile kept structurally separate from the clinical profile
-**Status:** accepted (2026-08-16)
-
-**Context.** RQ1 asks whether `C_u` adds information beyond PTA/SRT/WRS. If the two were
-merged into one object or one score, the question could not be asked.
-
-**Decision.** `HearingProfile` (audiometric + speech scores) and `ConfusionProfile` (three
-matrices) are separate types with separate persistence, and the feature builders that consume
-them are separately switchable so that the four required ablation arms are literal
-configurations rather than code edits.
-
-**Falsification.** If the combined arm never beats the clinical-only arm on held-out
-listener-level data, RQ1 is answered negatively and that must be reported.
+**반증 가능성:** 축소 목록이 홀드아웃 오청 예측을 더 잘한다는 근거가 나오면 기각됩니다.
+`with_smoothing`/`grouping`이 그 절제 실험을 저렴하게 만듭니다.
 
 ---
 
-## ADR-0009 — Synthetic provenance is a required field, enforced at every boundary
-**Status:** accepted (2026-08-16)
+## ADR-0005 — 독립적인 오류 분류체계, 명시적으로 재구현이 아님
+**상태:** 채택 (2026-08-16)
 
-**Decision.** `is_synthetic` is a required (non-defaulted) constructor argument on
-`ConfusionProfile` and on the listener/trial records, so it cannot be forgotten.
-`pool_profiles` refuses to merge synthetic and non-synthetic listeners, which would otherwise
-launder simulated evidence into a real listener's prior.
+**맥락.** Joo et al. (2026)은 오류를 10범주로 코딩합니다. 코딩 매뉴얼은 본 과제가 접근할 수
+없습니다.
+
+**결정.** AUDIRE는 정서법 분해로부터 자체 분류체계(정반응/대치/탈락/첨가/복합/무응답)를
+정의하고, 그 빈도가 해당 논문과 **호환되지 않음**을 문서화합니다. 초성의 `ㅇ`은 음운론적
+무음 초성이므로 `ㄱ→ㅇ`은 탈락, `ㅇ→ㄱ`은 첨가입니다. 종성의 탈락·첨가는 일반적인
+`NO_CODA` 전이입니다.
+
+**귀결.** AUDIRE의 어떤 출력도 출판된 오류율 표를 재현했다고 제시할 수 없습니다.
 
 ---
 
-## ADR-0010 — ASR uncertainty is a separate channel from listener mishearing risk
-**Status:** accepted (2026-08-16)
+## ADR-0006 — 명시적·직렬화 가능한 사전분포를 갖는 디리클레 사후평균 평활
+**상태:** 채택 (2026-08-16)
 
-**Context.** `AGENTS.md` §9: a bad ASR hypothesis must never become evidence that the listener
-would mishear the word.
+**맥락.** 25문항 교정으로는 19×20 초성 행렬 대부분을 관측할 수 없습니다. 평활하지 않은
+행은 퇴화(0 또는 1)하고 미관측 행은 정의되지 않습니다.
 
-**Decision.** `WordRisk` carries `asr_confidence` and `listener_risk` as distinct fields, and
-the caption policies rank on `listener_risk` only. ASR confidence is surfaced in the
-explanation and in the JSON export, and end-to-end evaluation reports ASR WER separately from
-mishearing-prediction error.
+**결정.** 행 *i*를 `(n_ij + α·π_ij) / (n_i + α)`로 추정합니다. `α`는 총 유사빈도,
+`π_i`는 합이 1인 명시적 사전분포 행입니다. 기본값은 `α = 1.0` + 균등 사전분포입니다.
+집단 프로파일이 있으면 `SmoothingSpec(kind="explicit", prior=group)`이 집단 쪽으로
+계층적 축소를 수행합니다.
+
+**기각.** 셀마다 1을 더하는 라플라스 평활 — 열이 20~28개이므로 유사빈도 20~28개를 주입해
+25시행 교정을 압도합니다.
+
+**안전장치.** `α = 0`에 미관측 행이 있으면 `NaN` 대신 예외를 던집니다. 빈도는 절대
+버려지지 않아 `p_correct`와 `n_observations`를 항상 함께 조회할 수 있습니다.
+미관측 행은 `unobserved_targets`와 `coverage`가 보고합니다.
+
+---
+
+## ADR-0007 — 라이선스로 잠긴 1차 코퍼스 없이도 시스템이 동작해야 함
+**상태:** 채택 (2026-08-16)
+
+**맥락.** 1차 코퍼스는 CC BY-NC-ND 4.0이고 카드가 사용 전 제작자 통보를 요청합니다.
+AUDIRE가 자동화해서는 안 되는 사람 단계이므로, 신규 평가자에게 음원이 없을 수 있습니다.
+
+**결정.** 두 번째 자극 출처를 함께 제공합니다: 한글 자모 목록 자체에서 생성한 결정론적
+음소 균형 설계(19 × 21 × 8 = 3,192 조합을 서로소 순환 순서로 방문하므로 앞 *k*개가 곧
+균형 잡힌 *k*문항 목록). 제3자 라이선스가 없습니다. 웹 클라이언트가 브라우저의 한국어
+음성합성으로 재생합니다.
+
+**모든 보고서에 명시할 제약.** 브라우저 음성합성은 **음압 교정이 되어 있지 않습니다.**
+이를 이용한 교정은 연구·접근성 측정이며 결코 임상 측정이 아닙니다. 사람 단계가 완료되면
+녹음 코퍼스가 여전히 선호되는 출처입니다.
+
+---
+
+## ADR-0008 — 혼동 프로파일을 임상 프로파일과 구조적으로 분리
+**상태:** 채택 (2026-08-16)
+
+**맥락.** RQ1은 `C_u`가 PTA/SRT/WRS를 넘어 정보를 더하는지 묻습니다. 둘을 하나의 객체나
+하나의 점수로 합치면 이 질문 자체가 성립하지 않습니다.
+
+**결정.** `HearingProfile`(청력·어음 점수)과 `ConfusionProfile`(행렬 3개)은 별개 타입이며
+별개로 영속화됩니다. 이를 소비하는 특징 빌더도 개별적으로 켜고 끌 수 있어, 필수 절제
+4개 arm이 코드 수정이 아니라 문자 그대로 설정이 됩니다.
+
+**반증.** 결합 arm이 홀드아웃 청취자 수준 데이터에서 임상 단독 arm을 결코 이기지 못하면
+RQ1은 음성으로 답해진 것이며 그렇게 보고해야 합니다.
+
+---
+
+## ADR-0009 — 합성 출처는 필수 필드이며 모든 경계에서 강제
+**상태:** 채택 (2026-08-16)
+
+**결정.** `is_synthetic`은 `ConfusionProfile`과 청취자·시행 레코드의 **기본값 없는 필수**
+생성자 인자이므로 잊을 수 없습니다. `pool_profiles`는 합성과 비합성 청취자의 병합을
+거부합니다 — 그렇지 않으면 시뮬레이션 근거가 실제 청취자의 사전분포로 세탁됩니다.
+
+---
+
+## ADR-0010 — ASR 불확실성은 청취자 오청 위험과 별개 채널
+**상태:** 채택 (2026-08-16)
+
+**맥락.** `AGENTS.md` §9: 잘못된 ASR 가설이 청취자가 오청할 것이라는 근거가 되어서는
+안 됩니다.
+
+**결정.** `WordRisk`는 `asr_confidence`와 `listener_risk`를 별개 필드로 보유하며,
+자막 정책은 **오직 `listener_risk`로만** 순위를 매깁니다. ASR 신뢰도는 설명과 JSON
+내보내기에 노출되고, 종단 평가는 ASR WER을 오청 예측 오류와 분리해 보고합니다.
+
+ASR 신뢰도가 낮아 표시된 단어는 `SHOWN_LOW_ASR_CONFIDENCE`라는 **구별되는 결정값**을
+받으므로, 자막 연구 채점 시 개인화 적중으로 계산될 수 없습니다.
+
+백엔드가 신뢰도를 제공하지 않으면 값은 `None`이며 **절대 조작된 기본값이 아닙니다.**
+조작된 신뢰도는 이 분리 자체를 무의미하게 만듭니다.
+
+---
+
+## ADR-0011 — 자막 예산은 청취자별 적용이 1차, 통합은 메커니즘 대조
+**상태:** 채택 (2026-08-16, RQ2 결과에 따라 추가)
+
+**맥락.** 초기 RQ2 분석은 총합 오청 재현율만 보고했습니다. 청취자별 예산과 통합 예산이
+전혀 다른 답을 준다는 것이 드러났습니다.
+
+**결정.** `select_budget()`이 두 모드를 모두 지원하고 두 결과를 항상 함께 보고합니다.
+`recall_by_listener()`가 청취자별 재현율 분포를 반환합니다.
+
+**이유.** 청취자 내부에서 상수인 특징(PTA·SRT·WRS)은 청취자 내 순위를 바꿀 수 없습니다.
+따라서 실제 배포 방식인 청취자별 예산에서는 이들이 정확히 무력합니다. 통합 예산에서는
+강력해지지만, **최하위 청취자의 재현율을 0.000으로** 만듭니다. 총합 지표만으로는 이것이
+큰 승리로 보고됩니다.
+
+**귀결.** `docs/RESEARCH_PLAN.md`가 지정한 1차 성과지표는 그 자체로 불충분하며,
+청취자별 재현율 분포가 공동 1차 지표여야 합니다. 이를 조용히 수정하지 않고 발견으로
+기록했습니다(`docs/RESULTS.md` §4).
+
+---
+
+## ADR-0012 — 최종 모델은 경험적 근거로 선택된 로지스틱 회귀
+**상태:** 채택 (2026-08-16, `rq1_main` 시드 101 결과에 따라)
+
+**맥락.** 연구 계획은 "AI처럼 보이게 하려고 딥러닝을 쓰지 말 것"과 "최종 모델은 경험적
+근거로 선택할 것"을 요구합니다.
+
+**결정.** 로지스틱 회귀(L2, `C=1.0`)를 1차 모델로 채택합니다.
+
+**근거.** 정당화된 비선형 비교 모델(히스토그램 그래디언트 부스팅)이 **모든 arm에서**
+로지스틱 회귀와 같거나 낮았습니다. 최선 arm에서 PR-AUC 0.6551 대 0.6666입니다.
+따라서 복잡도를 지불할 이유가 없고, 해석 가능한 계수를 얻습니다.
+
+**재검토 조건:** 실제 참여자 데이터에서 표본 크기가 크게 늘어나 비선형 상호작용을
+지지할 때. 실행기가 모든 결과에 학습 크기를 기록하므로 과적합된 비선형 승리는 가시적입니다.

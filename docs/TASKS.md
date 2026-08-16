@@ -1,161 +1,160 @@
-# AUDIRE Work Ledger
+# AUDIRE 작업 대장
 
-Live status. A gate is **done** only when its code, its tests and its recorded evidence
-all exist. Nothing below G8 may be described as a finished product.
+실시간 상태. 게이트는 **코드·테스트·기록된 근거가 모두 존재할 때만** 완료입니다.
+**G8 미만의 어떤 게이트도 "완성된 제품"으로 기술될 수 없습니다.**
 
-Legend: ✅ done · 🟡 partial · ⬜ not started · 🚫 externally blocked
-
----
-
-## G0 — evidence, licences, provenance, data layer ✅
-
-| item | status | evidence |
-|---|---|---|
-| Research plan / experiment plan / data registry / expert protocol in `docs/` | ✅ | `docs/` |
-| Source registry with per-source permitted/prohibited uses | ✅ | `data/sources.yaml` |
-| Licences verified against **live** source APIs | ✅ | ADR-0003; two discrepancies recorded |
-| Literature refs verified against publishers | ✅ | 4 entries with DOI + access date |
-| `scripts/fetch_data.py` — idempotent, restartable, manifest + SHA-256 | ✅ | `src/audire/data/fetch.py` |
-| Human-acknowledgement gate for the CC BY-NC-ND corpus | ✅ | 3 tests incl. "never offers to send" |
-| Prohibited-use tripwire | ✅ | `Source.assert_permits` + 2 tests |
-| Repo hygiene gate (no participant data, corpora, weights, secrets) | ✅ | `scripts/check_repo_hygiene.py`, in CI |
-| ADRs + risk register | ✅ | `docs/DECISIONS.md`, `docs/RISK_REGISTER.md` |
-| Makefile one-command entrypoints | ✅ | `Makefile` |
-| CI: format, lint, strict types, tests, provenance, privacy, smoke | ✅ | `.github/workflows/ci.yml` |
-
-## G1 — perceptual core ✅
-
-| item | status | evidence |
-|---|---|---|
-| Hangul decomposition/recomposition | ✅ | exhaustive over all 11,172 syllables |
-| `recompose(decompose(x)) == x` property | ✅ | exhaustive + Hypothesis on mixed text |
-| "No coda" as an explicit category, never `""` | ✅ | regression test |
-| Response parser + error taxonomy | ✅ | ADR-0005; 3 observations per trial always |
-| Confusion matrices: counts and probabilities separate | ✅ | `n_observations` always available |
-| Omission / addition / no-response as ordinary cells | ✅ | 5 tests |
-| Dirichlet smoothing with explicit serialisable prior | ✅ | ADR-0006 |
-| Rows sum to 1 including unobserved rows | ✅ | parametrised over all positions |
-| Korean phonology tables (7-coda neutralisation, 3-way laryngeal) | ✅ | import-time self-check |
-
-## G2 — profile and simulation ✅
-
-| item | status | evidence |
-|---|---|---|
-| `HearingProfile` with explicit missingness | ✅ | `missing()` / `available()` / `completeness()` |
-| PTA names its method; partial averages refused | ✅ | 5 named methods + `pta_detail` |
-| "No response at max output" ≠ "not tested" ≠ threshold | ✅ | dedicated test |
-| WRS requires its presentation level | ✅ | validator + test |
-| PBmax / PI function / rollover (descriptive only) | ✅ | `PIFunction` |
-| MCL/UCL with ordering validation | ✅ | `LoudnessLevels` |
-| Severity strata from a named, cited scheme | ✅ | WHO grades, verified 2026-08-16 |
-| Private profile store (git-ignored) + export + delete | ✅ | `ProfileStore` |
-| Simulator: every constant carries an evidence label | ✅ | `Evidenced` base class |
-| Listener accuracy anchored to Joo et al. 2026 | ✅ | `solve_position_error_mass` |
-| Generator structurally differs from the scoring model | ✅ | lexical repair (RISK S2) |
-| Parameter recovery as calibration lengthens | ✅ | `@pytest.mark.slow` test |
-| `is_synthetic` propagated everywhere | ✅ | one test over the whole cohort |
-| `model_inputs()` cannot expose the true structure | ✅ | dedicated test |
-
-## G3 — risk modelling ✅
-
-| item | status | evidence |
-|---|---|---|
-| Deterministic `R_phon` baseline | ✅ | `PhonemeIndependenceRisk` |
-| PTA-only / PTA+SRT+WRS / confusion-only / combined arms | ✅ | `ABLATION_ARMS`, nested blocks |
-| Non-personalized floor arm | ✅ | `word_context_only` |
-| Nonlinear comparator | ✅ | `GradientBoostedRiskModel` |
-| Fold-safe imputation with missing indicators | ✅ | inside the sklearn Pipeline |
-| Listener-level splits only; leakage guard on every fold | ✅ | `LeakySplitter` proves it fires |
-| Brier / log loss / ECE / MCE / reliability + PR-AUC / ROC-AUC | ✅ | `eval/metrics.py`, 100% covered |
-| Prevalence floor reported per arm | ✅ | `prevalence_baseline_metrics` |
-| Listener-level bootstrap; paired contrasts | ✅ | `eval/bootstrap.py` |
-| Platt / isotonic calibration on held-out **listeners** | ✅ | `CalibratedRiskModel` |
-
-## G4 — caption engine ✅
-
-| item | status | evidence |
-|---|---|---|
-| `WordRisk` keeps ASR confidence separate from listener risk | ✅ | ADR-0010 + tests |
-| Threshold policy | ✅ | `ThresholdPolicy` |
-| Fixed-budget policy | ✅ | `BudgetPolicy`, deterministic under ties |
-| Full-caption mode | ✅ | `FullCaptionPolicy` |
-| Per-word explanation with evidence counts | ✅ | `WordRisk.explanation` |
-| SRT / ASS / JSON export with snapshot tests | ✅ | validated non-overlapping cues |
-| Caption-budget Pareto study (RQ2) | ✅ | per-listener **and** pooled |
-| Personalized vs global threshold (RQ3) | ✅ | with the equity view |
-
-## G5 — end-to-end ASR ✅ (real weights not yet exercised here)
-
-| item | status | evidence |
-|---|---|---|
-| Replaceable ASR adapter interface | ✅ | `ASRBackend`, `Token`, `Transcript` |
-| `faster-whisper` backend with word timestamps | ✅ | written against the verified current API |
-| Per-token confidence kept separate from risk | ✅ | `None` when absent, never fabricated |
-| Word-timestamp defects surfaced, not swallowed | ✅ | `Transcript.timing_problems()` |
-| Missing weights fail loudly, never degrade silently | ✅ | `ASRUnavailable` with an actionable message |
-| Replay backend for deterministic CI | ✅ | preserves the original recogniser's identity |
-| Non-Hangul tokens kept and flagged, not dropped | ✅ | `meta.reason_not_scored` |
-| Incomplete profile / thin calibration refused | ✅ | `check_ready`, ≥10 trials |
-| CPU-only E2E smoke test (no model download) | ✅ | 21 integration tests |
-| **Real `faster-whisper` weights run on audio** | ⬜ | `@pytest.mark.asr` tests exist but have **not** been executed against downloaded weights on this machine |
-| WER reported separately from mishearing error | ⬜ | contract in place; E7 regression not run |
-| Media ingest verified for mp3/mp4 | ⬜ | ffmpeg 7.1.1 present; not exercised |
-
-## G6 — complete user system ⬜ NOT STARTED
-
-| item | status | note |
-|---|---|---|
-| FastAPI application | ⬜ | fastapi 0.141.1 installed, no app written |
-| Profile create/import UI | ⬜ | schema and store are ready behind it |
-| Calibration session UI | ⬜ | built-in balanced stimulus list is ready |
-| Upload → transcribe → risk → caption UI | ⬜ | depends on G5 |
-| Export SRT / ASS / JSON from the UI | ⬜ | exporters are ready behind it |
-| API contract tests + browser E2E | ⬜ | |
-
-## G7 — validation and sensitivity 🟡 PARTIAL
-
-| item | status | evidence |
-|---|---|---|
-| Preregistered config with all seeds executed | ✅ | `experiments/configs/rq1_main.yaml` |
-| Ablation + caption + threshold studies recorded | ✅ | `experiments/registry.yaml` |
-| Calibration-length study (10/25/50/100/full) | ⬜ | selection strategies exist, sweep not run |
-| SNR sweep | 🟡 | simulator supports it; one condition run |
-| Speaker sensitivity | 🟡 | simulator supports it; not analysed |
-| Subgroup analysis by severity / WRS band | ⬜ | cohort records the strata |
-| Idiosyncrasy sweep (Dirichlet concentration) | ⬜ | **the key missing sweep** given the RQ2 finding |
-| Expert review | 🚫 | instruments prepared; **no review conducted** |
-
-## G8 — reproducible release 🟡 PARTIAL
-
-| item | status | evidence |
-|---|---|---|
-| Experiment registry with git SHA / lock hash / seeds / manifests | ✅ | `src/audire/experiments/registry.py` |
-| `make simulate` / `eval` / `caption-eval` / `figures` | ✅ | via the `audire` CLI |
-| Figures and tables regenerate from recorded artifacts alone | ✅ | `experiments/figures.py` |
-| `make reproduce` full chain | 🟡 | the `sensitivity` target is not implemented |
-| Fresh-environment install verification | ⬜ | |
-| Final technical/research report | 🟡 | `docs/RESULTS.md` holds the recorded findings |
+범례: ✅ 완료 · 🟡 부분 · ⬜ 미착수 · 🚫 외부 요인으로 차단
 
 ---
 
-## External blockers (cannot be resolved by software)
+## G0 — 근거·라이선스·출처·데이터 계층 ✅
 
-| id | blocker | exact action required |
+| 항목 | 상태 | 근거 |
 |---|---|---|
-| B1 | Human participant data | Institutional/school ethics approval and informed consent **before any collection**. None obtained; none collected. |
-| B2 | Primary corpus notification | The dataset card asks users to inform Woojae Han (woojaehan@hallym.ac.kr) of intended use and scope. A human must do this, then set `AUDIRE_PRIMARY_DATA_USE_NOTIFIED=1`. AUDIRE will not send it. |
-| B3 | Expert review | Requires the hearing professional's time and their consent to report credentials. Protocol is ready in `docs/EXPERT_PROTOCOL.md`. |
+| 연구 계획·실험 계획·데이터 레지스트리·전문가 프로토콜 배치 | ✅ | `docs/` |
+| 출처별 허용/금지 용도를 담은 출처 레지스트리 | ✅ | `data/sources.yaml` |
+| 라이선스를 **라이브 API**에서 검증 | ✅ | ADR-0003, 불일치 2건 기록 |
+| 문헌 참조를 출판사 페이지에서 검증 | ✅ | DOI·접근일 포함 4건 |
+| `scripts/fetch_data.py` — 멱등·재개 가능·매니페스트+SHA-256 | ✅ | `src/audire/data/fetch.py` |
+| CC BY-NC-ND 코퍼스에 대한 사람 승인 게이트 | ✅ | "대신 보내지 않는다" 포함 테스트 3건 |
+| 금지 용도 지뢰선 | ✅ | `Source.assert_permits` + 테스트 2건 |
+| 저장소 위생 게이트(참여자 데이터·코퍼스·가중치·비밀키 차단) | ✅ | `scripts/check_repo_hygiene.py`, CI 연동 |
+| ADR + 위험 대장 | ✅ | `docs/DECISIONS.md`, `docs/RISK_REGISTER.md` |
+| Makefile 원커맨드 진입점 | ✅ | `Makefile` |
+| CI: 포맷·린트·엄격 타입·테스트·출처·프라이버시·스모크 | ✅ | `.github/workflows/ci.yml` |
+
+## G1 — 지각 핵심 ✅
+
+| 항목 | 상태 | 근거 |
+|---|---|---|
+| 한글 분해/조합 | ✅ | 11,172개 음절 전수 검증 |
+| `recompose(decompose(x)) == x` 속성 | ✅ | 전수 + 혼합 문자열 Hypothesis |
+| "받침 없음"을 빈 문자열이 아닌 **명시적 범주**로 | ✅ | 회귀 테스트 |
+| 응답 파서 + 오류 분류체계 | ✅ | ADR-0005, 시행당 항상 관측 3개 |
+| 혼동행렬: 빈도와 확률을 분리 저장 | ✅ | `n_observations` 항상 조회 가능 |
+| 탈락/첨가/무응답을 일반 셀로 표현 | ✅ | 테스트 5건 |
+| 명시적 사전분포를 갖는 디리클레 평활 | ✅ | ADR-0006 |
+| 미관측 행 포함 모든 행의 합이 1 | ✅ | 전 위치 파라미터화 테스트 |
+| 한국어 음운 표(7종성 중화, 3중 대립) | ✅ | 임포트 시 자기검사 |
+
+## G2 — 프로파일 + 시뮬레이션 ✅
+
+| 항목 | 상태 | 근거 |
+|---|---|---|
+| 명시적 결측 처리를 갖는 `HearingProfile` | ✅ | `missing()` / `available()` / `completeness()` |
+| PTA가 계산 방법을 명시하고 부분 평균을 거부 | ✅ | 명명된 방법 5종 + `pta_detail` |
+| "최대출력 무반응" ≠ "미검사" ≠ 그 수준의 역치 | ✅ | 전용 테스트 |
+| WRS는 제시 강도를 필수로 요구 | ✅ | 검증기 + 테스트 |
+| PBmax / PI 함수 / 롤오버(기술적 지표에 한정) | ✅ | `PIFunction` |
+| MCL/UCL 순서 검증 | ✅ | `LoudnessLevels` |
+| 명명·인용된 체계에 따른 중증도 계층 | ✅ | WHO 등급, 2026-08-16 검증 |
+| 비공개 프로파일 저장소 + 내보내기 + 삭제 | ✅ | `ProfileStore` |
+| 시뮬레이터의 모든 상수가 근거 라벨을 보유 | ✅ | `Evidenced` 기반 클래스 |
+| 청취자 정확도를 Joo et al. 2026에 정박 | ✅ | `solve_position_error_mass` |
+| 생성기가 채점 모델과 구조적으로 다름 | ✅ | 어휘 복구 (위험 S2) |
+| 교정 길이 증가에 따른 파라미터 복원 | ✅ | `@pytest.mark.slow` 테스트 |
+| `is_synthetic` 전 구간 전파 | ✅ | 코호트 전체 검사 테스트 |
+| `model_inputs()`가 진짜 구조를 노출할 수 없음 | ✅ | 전용 테스트 |
+
+## G3 — 위험 모델링 ✅
+
+| 항목 | 상태 | 근거 |
+|---|---|---|
+| 결정론적 `R_phon` 베이스라인 | ✅ | `PhonemeIndependenceRisk` |
+| PTA만 / PTA+SRT+WRS / 혼동만 / 결합 arm | ✅ | `ABLATION_ARMS`, 중첩 구조 |
+| 비개인화 바닥 arm | ✅ | `word_context_only` |
+| 비선형 비교 모델 | ✅ | `GradientBoostedRiskModel` |
+| 폴드 안전 대치 + 결측 표시 열 | ✅ | sklearn 파이프라인 내부 |
+| 청취자 수준 분할만 허용, 폴드마다 누출 검사 | ✅ | `LeakySplitter`가 발동을 증명 |
+| Brier / 로그손실 / ECE / MCE / 신뢰도곡선 + PR-AUC / ROC-AUC | ✅ | `eval/metrics.py`, 커버리지 100 % |
+| arm별 유병률 바닥값 보고 | ✅ | `prevalence_baseline_metrics` |
+| 청취자 수준 부트스트랩, 쌍대 대조 | ✅ | `eval/bootstrap.py` |
+| 홀드아웃 **청취자**에 대한 Platt/등장회귀 보정 | ✅ | `CalibratedRiskModel` |
+
+## G4 — 자막 엔진 ✅
+
+| 항목 | 상태 | 근거 |
+|---|---|---|
+| `WordRisk`가 ASR 신뢰도와 청취자 위험을 분리 보관 | ✅ | ADR-0010 + 테스트 |
+| 임계값 정책 | ✅ | `ThresholdPolicy` |
+| 고정 예산 정책 | ✅ | `BudgetPolicy`, 동점 시 결정론적 |
+| 전체 자막 모드 | ✅ | `FullCaptionPolicy` |
+| 근거 빈도를 포함한 단어별 설명 | ✅ | `WordRisk.explanation` |
+| 스냅샷 테스트를 갖춘 SRT/ASS/JSON 내보내기 | ✅ | 비중첩 큐 검증 |
+| 자막 예산 파레토 연구 (RQ2) | ✅ | 청취자별 **및** 통합 |
+| 개인화 vs 전역 임계값 (RQ3) | ✅ | 형평성 관점 포함 |
+
+## G5 — 종단 ASR ✅ (실제 가중치는 미실행)
+
+| 항목 | 상태 | 근거 |
+|---|---|---|
+| 교체 가능한 ASR 어댑터 인터페이스 | ✅ | `ASRBackend`, `Token`, `Transcript` |
+| 단어 타임스탬프를 갖는 `faster-whisper` 백엔드 | ✅ | 검증된 현행 API에 맞춰 작성 |
+| 토큰별 신뢰도를 위험과 분리 | ✅ | 없으면 `None`, 절대 조작값 아님 |
+| 단어 타임스탬프 결함을 삼키지 않고 노출 | ✅ | `Transcript.timing_problems()` |
+| 가중치 부재 시 조용히 대체하지 않고 명시적 실패 | ✅ | 조치 가능한 메시지의 `ASRUnavailable` |
+| 결정론적 CI용 리플레이 백엔드 | ✅ | 원래 인식기의 정체성을 보존 |
+| 비한글 토큰을 버리지 않고 유지·표시 | ✅ | `meta.reason_not_scored` |
+| 불완전 프로파일 / 빈약한 교정 거부 | ✅ | `check_ready`, 10시행 이상 |
+| CPU 전용 종단 스모크 테스트(모델 다운로드 없음) | ✅ | 통합 테스트 21건 |
+| **실제 `faster-whisper` 가중치로 음성 인식 실행** | ⬜ | `@pytest.mark.asr` 테스트는 존재하나 이 머신에서 다운로드된 가중치로 **실행되지 않음** |
+| 오청 오류와 분리된 WER 보고 | ⬜ | 계약은 마련, E7 회귀 미실행 |
+| mp3/mp4 미디어 수용 검증 | ⬜ | ffmpeg 7.1.1 존재, 미실행 |
+
+## G6 — 완성된 사용자 시스템 ⬜ 미착수
+
+| 항목 | 상태 | 비고 |
+|---|---|---|
+| FastAPI 애플리케이션 | ⬜ | fastapi 0.141.1 설치됨, 앱 미작성 |
+| 프로파일 생성/가져오기 UI | ⬜ | 뒤단 스키마·저장소는 준비 완료 |
+| 교정 세션 UI | ⬜ | 내장 균형 자극 목록 준비 완료 |
+| 업로드 → 전사 → 위험 → 자막 UI | ⬜ | G5에 의존 |
+| UI에서 SRT/ASS/JSON 내보내기 | ⬜ | 내보내기 모듈은 준비 완료 |
+| API 계약 테스트 + 브라우저 E2E | ⬜ | |
+
+## G7 — 검증·민감도 🟡 부분
+
+| 항목 | 상태 | 근거 |
+|---|---|---|
+| 모든 시드를 실행하는 사전등록 설정 | ✅ | `experiments/configs/rq1_main.yaml` |
+| 절제·자막·임계값 연구 기록 | ✅ | `experiments/registry.yaml` |
+| 교정 길이 연구 (10/25/50/100/전체) | ⬜ | 선택 전략은 구현, 스윕 미실행 |
+| SNR 스윕 | 🟡 | 시뮬레이터 지원, 단일 조건만 실행 |
+| 화자 민감도 | 🟡 | 시뮬레이터 지원, 미분석 |
+| 중증도·WRS 대역별 하위군 분석 | ⬜ | 코호트가 계층 정보를 보유 |
+| 개인 특이성 스윕(디리클레 집중도) | ⬜ | RQ2 결과에 비추어 **가장 중요한 미실행 스윕** |
+| 전문가 검토 | 🚫 | 도구는 준비, **검토 미시행** |
+
+## G8 — 재현 가능한 릴리스 🟡 부분
+
+| 항목 | 상태 | 근거 |
+|---|---|---|
+| git SHA / 락 해시 / 시드 / 매니페스트를 담은 실험 레지스트리 | ✅ | `src/audire/experiments/registry.py` |
+| `make simulate` / `eval` / `caption-eval` / `figures` | ✅ | `audire` CLI 경유 |
+| 기록된 아티팩트만으로 표·그림 재생성 | ✅ | `experiments/figures.py` |
+| `make reproduce` 전체 체인 | 🟡 | `sensitivity` 타깃 미구현 |
+| 새 환경 설치 검증 | ⬜ | |
+| 최종 기술·연구 보고서 | 🟡 | `docs/RESULTS.md`가 기록된 결과를 보유 |
 
 ---
 
-## Next highest-risk work, in order
+## 외부 차단 요인 (소프트웨어로 해결 불가)
 
-1. **Idiosyncrasy × calibration-length sweep.** The RQ2 result says the confusion profile
-   does not beat a word-length heuristic at a per-listener budget under the current
-   generative settings. The sweep determines whether that is a property of the method or of
-   the chosen `dirichlet_concentration` and 100-trial calibration. This is the single most
-   informative remaining experiment.
-2. **G5 ASR adapter**, because G6 depends on it and because the ASR-versus-listener-risk
-   separation is currently only a contract, never exercised on real audio.
-3. **G6 API and web application.**
-4. Fresh-environment install verification and the final report.
+| ID | 차단 요인 | 필요한 정확한 조치 |
+|---|---|---|
+| B1 | 사람 참여자 데이터 | 수집 **이전에** 기관/학교 IRB 승인과 사전 동의. 미획득·미수집. |
+| B2 | 1차 코퍼스 통보 | 데이터셋 카드가 Woojae Han(woojaehan@hallym.ac.kr)에게 사용 목적·범위 통보를 요청. 사람이 수행 후 `AUDIRE_PRIMARY_DATA_USE_NOTIFIED=1` 설정. AUDIRE는 대신 보내지 않음. |
+| B3 | 전문가 검토 | 청각 전문가의 시간과 자격 공개 동의 필요. 프로토콜은 `docs/EXPERT_PROTOCOL.md`에 준비 완료. |
+
+---
+
+## 다음 우선순위 (위험도 순)
+
+1. **개인 특이성 × 교정 길이 스윕.** RQ2 결과는 청취자별 예산에서 혼동행렬이 단어길이
+   휴리스틱을 이기지 못한다고 말합니다. 이것이 방법의 성질인지, 아니면 선택된
+   `dirichlet_concentration`과 100시행 교정의 성질인지를 이 스윕이 결정합니다.
+   **남은 실험 중 정보량이 가장 큽니다.**
+2. **G5 ASR 어댑터의 실제 가중치 검증.** G6가 여기에 의존하며, ASR 대 청취자 위험 분리가
+   현재는 계약으로만 존재하고 실제 음성에서 한 번도 행사되지 않았습니다.
+3. **G6 API 및 웹 애플리케이션.**
+4. 새 환경 설치 검증과 최종 보고서.

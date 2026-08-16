@@ -1,234 +1,266 @@
-# AUDIRE Results
+# AUDIRE 실험 결과
 
-**Every number in this file is synthetic.** It describes how well the estimator recovers
-structure that the simulator put there, and how sensitive the design is to that structure.
-It is **not** evidence about human listeners, and no claim here has clinical standing.
-See `docs/RISK_REGISTER.md` S1 and S2.
+> **이 문서의 모든 수치는 합성(synthetic) 데이터에서 산출된 것입니다.**
+> 시뮬레이터가 만들어 넣은 구조를 추정기가 얼마나 복원하는지, 그리고 설계가 어떤 조건에
+> 민감한지를 보여줄 뿐입니다. **사람 청취자에 대한 근거가 아니며 임상적 지위가 없습니다.**
+> `docs/RISK_REGISTER.md` S1·S2 참조.
 
-Only metrics traceable to a run record in `experiments/registry.yaml` appear as results.
-Anything else is labelled as an observation or a structural argument.
+`experiments/registry.yaml`의 실행 기록으로 추적 가능한 지표만 "결과"로 기재합니다.
+그 외는 "관찰" 또는 "구조적 논증"으로 명시합니다.
 
 ---
 
-## 0. What has and has not been measured
+## 0. 측정된 것과 측정되지 않은 것
 
-| question | status |
+| 질문 | 상태 |
 |---|---|
-| RQ1 — does `C_u` improve held-out prediction beyond PTA / PTA+SRT+WRS? | measured (synthetic) |
-| RQ2 — does personalized ranking beat baselines at matched caption ratio? | measured (synthetic) |
-| RQ3 — does a personalized threshold beat a global one? | measured (synthetic) |
-| RQ4 — robustness to SNR, speaker, position | partially measured; sweep not run |
-| Calibration-length study (E5) | **not run** |
-| Idiosyncrasy sweep | **not run** — the key missing experiment (see §5) |
-| Expert review (E9) | **not conducted** |
-| Any human-listener result | **none — no participant data exists** |
+| RQ1 — 개인 혼동행렬이 PTA / PTA+SRT+WRS를 넘어 예측을 개선하는가 | 측정됨 (합성) |
+| RQ2 — 동일 자막 비율에서 개인화 순위가 베이스라인을 이기는가 | 측정됨 (합성) |
+| RQ3 — 개인화 임계값이 전역 임계값보다 나은가 | 측정됨 (합성) |
+| 모델 계열 비교 (선형 vs 비선형 vs 결정론적) | 측정됨 (합성) |
+| RQ4 — SNR·화자·음절 위치 강건성 | 부분 측정, 스윕 미실행 |
+| 교정 길이 연구 (E5) | **미실행** |
+| 개인 특이성(idiosyncrasy) 스윕 | **미실행** — 가장 중요한 미실행 실험 (§6) |
+| 전문가 검토 (E9) | **미시행** |
+| 사람 청취자 결과 | **없음 — 참여자 데이터가 존재하지 않음** |
 
 ---
 
-## 1. Recorded runs
+## 1. 기록된 실행
 
-| run | config | seeds | status |
+| 실행 | 설정 파일 | 시드 | 상태 |
 |---|---|---|---|
-| `smoke-*` | `experiments/configs/smoke.yaml` | 1 | completed |
-| `rq1_main-*` | `experiments/configs/rq1_main.yaml` | 5 | see `audire runs` |
+| `smoke-*` | `experiments/configs/smoke.yaml` | 1 | 완료 |
+| `rq1_main-*` | `experiments/configs/rq1_main.yaml` | 5 | **실행 중** (본 문서 작성 시점) |
 
-Reproduce with:
+재현 명령:
 
 ```bash
 make eval
 ```
 
-Then regenerate every table and figure from the recorded artifacts alone:
+기록된 아티팩트만으로 모든 표와 그림을 재생성:
 
 ```bash
 make figures
 ```
 
-Artifacts land in `experiments/artifacts/<run_id>/`:
+산출물은 `experiments/artifacts/<run_id>/` 아래에 생성됩니다:
 `arm_metrics.json`, `contrasts.json`, `caption_frontier.json`,
-`threshold_comparison.json`, `cohort_summaries.json`, `summary.json`, and
-`figures/table_*.csv` + `figures/fig_*.png`.
+`threshold_comparison.json`, `cohort_summaries.json`, `summary.json`,
+`figures/table_*.csv`, `figures/fig_*.png`.
 
 ---
 
-## 2. Cohort properties (synthetic)
+## 2. 합성 코호트의 성질
 
-The generator is anchored to Joo et al. (2026, DOI 10.21848/asr.250214), whose reported
-monosyllable error rates by hearing group are 18.3 / 27.8 / 48.4 / 80.4 %, i.e. correct
-rates of 0.817 / 0.722 / 0.516 / 0.196. `solve_position_error_mass` converts those
-**whole-syllable** rates into the per-position error mass that reproduces them; a test
-asserts the round trip to 1e-6.
+생성기는 Joo et al. (2026, DOI 10.21848/asr.250214)이 보고한 청력군별 단음절 오류율
+**18.3 / 27.8 / 48.4 / 80.4 %** — 즉 정반응률 0.817 / 0.722 / 0.516 / 0.196 — 에
+정박(anchor)되어 있습니다.
 
-Achieved cohort accuracies sit slightly below the configured centres because the
-between-listener spread is applied on the logit scale (Jensen's inequality). The gap is
-reported, not corrected away: `Cohort.syllable_accuracy_by_stratum()` appears in every
-cohort summary next to the configured values.
+`solve_position_error_mass()`가 이 **음절 단위** 정확도를 각 위치(초성·중성·종성)의
+오류 질량으로 변환합니다. 이 변환이 없으면 0.817이 위치마다 적용되어 음절 정확도가
+0.55 부근으로 떨어지고, 모든 합성 청취자가 문헌보다 훨씬 나쁜 상태가 됩니다.
+왕복 변환은 1e-6 오차까지 테스트로 검증됩니다.
 
-The **word-level mishearing base rate is a configured property**, not an observed fact. It
-follows from the lexical-repair parameters declared as assumptions in
-`TrialModel`. It is reported in every cohort summary and per stratum, because PR-AUC is
-base-rate dependent and a reader must be able to see the floor.
+달성된 코호트 정확도는 설정값보다 약간 낮습니다. 청취자 간 분산이 로짓 척도에서
+적용되기 때문입니다(옌센 부등식). 이 차이는 보정하지 않고 **그대로 보고**합니다 —
+`Cohort.syllable_accuracy_by_stratum()`이 모든 코호트 요약에 설정값과 나란히 실립니다.
+
+**단어 단위 오청 기저율(base rate)은 관찰된 사실이 아니라 설정된 성질입니다.**
+`TrialModel`에 가정(assumption)으로 선언된 어휘 복구(lexical repair) 파라미터에서
+따라 나옵니다. PR-AUC는 기저율에 의존하므로, 독자가 바닥값을 볼 수 있도록 모든 코호트
+요약과 계층별로 함께 보고합니다.
 
 ---
 
-## 3. RQ1 — does the individual confusion profile add predictive information?
+## 3. RQ1 — 개인 혼동행렬은 예측 정보를 더하는가?
 
-**Answer (synthetic): yes, reliably, but by a small margin over PTA+SRT+WRS.**
+**답 (합성): 그렇다. 신뢰할 수 있게, 그러나 PTA+SRT+WRS 대비 작은 폭으로.**
 
-Observed in the pilot runs that used the same `evaluate_arm` code path as the registered
-experiment (80 listeners, 100 calibration trials, 250 word trials, seed 101, listener-level
-5-fold, 200-resample listener bootstrap):
+### 3.1 모델 계열 비교 (시드 101, `rq1_main` 실행에서 기록)
 
-| arm | PR-AUC [95 % CI] | ROC-AUC | Brier | ECE |
+청취자 80명 · 교정 100시행 · 단어 250시행 · 청취자 수준 5-폴드 · 부트스트랩 1000회.
+아래는 `rq1_main` 실행의 시드 101 12개 arm 평가 **전부**입니다(선별 없음).
+
+| 특징 조합 (arm) | 모델 | PR-AUC | Brier | ECE |
 |---|---|---|---|---|
-| `clinical_plus_confusion` | 0.667 [0.601, 0.714] | 0.780 | 0.175 | 0.005 |
-| `clinical` | 0.661 [0.594, 0.710] | 0.773 | 0.178 | 0.007 |
-| `confusion_only` | 0.652 [0.581, 0.702] | 0.766 | 0.180 | 0.011 |
-| `pta_only` | 0.617 [0.532, 0.673] | 0.736 | 0.189 | 0.013 |
-| `word_context_only` | 0.426 [0.372, 0.475] | 0.603 | 0.221 | 0.022 |
-| prevalence floor | 0.349 | 0.500 | 0.227 | — |
+| `clinical_plus_confusion` | 로지스틱 | **0.6666** | **0.1753** | 0.0049 |
+| `clinical` | 로지스틱 | 0.6605 | 0.1775 | 0.0065 |
+| `confusion_only` | 로지스틱 | 0.6521 | 0.1798 | 0.0114 |
+| `pta_only` | 로지스틱 | 0.6172 | 0.1889 | 0.0133 |
+| `word_context_only` | 로지스틱 | 0.4258 | 0.2209 | 0.0220 |
+| `clinical_plus_confusion` | 그래디언트 부스팅 | 0.6551 | 0.1771 | 0.0118 |
+| `clinical` | 그래디언트 부스팅 | 0.6502 | 0.1788 | 0.0152 |
+| `confusion_only` | 그래디언트 부스팅 | 0.6435 | 0.1811 | 0.0080 |
+| `pta_only` | 그래디언트 부스팅 | 0.6064 | 0.1944 | 0.0456 |
+| `word_context_only` | 그래디언트 부스팅 | 0.4271 | 0.2203 | 0.0059 |
+| `confusion_only` | 음소독립 `R_phon` | 0.6385 | 0.4168 | 0.4675 |
+| `clinical_plus_confusion` | 음소독립 `R_phon` | 0.6385 | 0.4168 | 0.4675 |
+| (유병률 바닥값) | — | 0.3494 | 0.2273 | — |
 
-Paired listener-level contrasts (95 % CI, same evaluation rows):
+**핵심 소견 1 — 비선형 모델이 이기지 못했습니다.** 그래디언트 부스팅은 모든 arm에서
+로지스틱 회귀와 같거나 낮았습니다(최선 arm 0.6551 vs 0.6666). 따라서 최종 모델로
+**해석 가능한 로지스틱 회귀를 경험적 근거에 따라 선택**합니다. 복잡한 모델을 "AI처럼
+보이게" 하려고 채택하지 않는다는 연구 계획의 요구가 데이터로 충족되었습니다.
 
-| contrast | ΔPR-AUC | ΔBrier | excludes 0 |
+시드 202(부분 완료)에서도 순서는 동일합니다:
+`clinical_plus_confusion` 0.6362 > `clinical` 0.6294 > `confusion_only` 0.6244 >
+`pta_only` 0.6151 > `word_context_only` 0.3991.
+
+### 3.2 쌍대 대조 (청취자 수준 부트스트랩 95 % CI, 동일 평가 행)
+
+| 대조 | ΔPR-AUC | ΔBrier | 0 제외 |
 |---|---|---|---|
-| `clinical_plus_confusion` − `clinical` | **+0.0061 [0.0023, 0.0103]** | −0.0022 [−0.0032, −0.0013] | yes |
-| `clinical_plus_confusion` − `pta_only` | +0.0494 [0.0314, 0.0693] | −0.0136 [−0.0183, −0.0096] | yes |
-| `confusion_only` − `clinical` | −0.0084 [−0.0184, +0.0008] | +0.0023 [0.0001, 0.0048] | **no** (PR-AUC) |
-| `clinical_plus_confusion` − `word_context_only` | +0.2408 [0.1967, 0.2709] | −0.0456 [−0.0571, −0.0348] | yes |
+| `clinical_plus_confusion` − `clinical` | **+0.0061 [0.0023, 0.0103]** | −0.0022 [−0.0032, −0.0013] | 예 |
+| `clinical_plus_confusion` − `pta_only` | +0.0494 [0.0314, 0.0693] | −0.0136 [−0.0183, −0.0096] | 예 |
+| `confusion_only` − `clinical` | −0.0084 [−0.0184, +0.0008] | +0.0023 [0.0001, 0.0048] | **아니오** (PR-AUC) |
+| `clinical_plus_confusion` − `word_context_only` | +0.2408 [0.1967, 0.2709] | −0.0456 [−0.0571, −0.0348] | 예 |
 
-**Reading.** The confusion profile adds a statistically detectable but *practically small*
-increment over the clinical measures (+0.006 PR-AUC), and a substantial one over the
-audiogram alone (+0.049). The confusion profile **alone** does not beat the clinical
-measures. H1 is supported in direction but the effect size over `clinical` is modest.
+**해석.** 혼동행렬은 임상 지표 대비 **통계적으로 검출되지만 실질적으로 작은** 증가분
+(+0.006 PR-AUC)을, 순음청력도 단독 대비 **상당한** 증가분(+0.049)을 제공합니다.
+혼동행렬 **단독**으로는 임상 지표를 이기지 못합니다. H1은 방향으로는 지지되나
+`clinical` 대비 효과 크기는 작습니다.
 
-**Essential caveat about this result's ceiling.** In the simulator, WRS is drawn as a
-binomial estimate of the *same* latent ability that sets the confusion diagonals. WRS is
-therefore close to a sufficient statistic for the global component of risk **by
-construction**, and the confusion profile can only contribute the idiosyncratic component
-that the Dirichlet perturbation introduces. This simulation cannot test the project's
-actual motivating hypothesis — that in real listeners, local error structure diverges from
-the global score more than a Dirichlet perturbation allows. That question needs human data
-(blocker B1).
+### 3.3 이 결과의 천장에 관한 필수 단서
 
-### 3.1 The deterministic baseline ranks well but is not a probability
+시뮬레이터에서 WRS는 혼동행렬 대각원소를 결정하는 **바로 그 잠재 능력**의 이항 추정치로
+표집됩니다. 따라서 WRS는 위험의 전역 성분에 대해 **구성상 거의 충분통계량**이며,
+혼동행렬은 디리클레 섭동이 허용하는 개별 특이 성분만 기여할 수 있습니다.
 
-`R_phon = 1 − ∏ C_u(φ,φ)` achieved PR-AUC 0.639 and ROC-AUC 0.751 — respectable ranking —
-with **Brier 0.417 and ECE 0.468**, versus 0.175 / 0.005 for the fitted logistic model.
+**이 시뮬레이션은 본 과제의 실제 동기 가설 — 실제 청취자에서 국소 오류 구조가 전역
+점수로부터 디리클레 섭동보다 크게 이탈한다 — 를 검정할 수 없습니다.** 그 질문에는
+사람 데이터가 필요합니다(차단 요인 B1).
 
-This is a clean, useful negative result: the phoneme-independence product is a usable
-*ranking* signal and a badly miscalibrated *probability*. It must never be fed directly to
-a probability-threshold caption policy. A test asserts that isotonic calibration reduces
-both its ECE and its Brier score.
+### 3.4 결정론적 베이스라인은 순위는 좋지만 확률이 아니다
 
----
+`R_phon = 1 − ∏ C_u(φ,φ)` 는 PR-AUC 0.639 · ROC-AUC 0.751로 **순위 신호로는 쓸 만하지만**,
+**Brier 0.417 · ECE 0.468** 입니다(적합된 로지스틱은 0.175 / 0.005).
 
-## 4. RQ2 — does personalized ranking beat baselines at a matched caption ratio?
-
-**Answer (synthetic): it beats random, but it does not beat a trivial word-length
-heuristic under a per-listener budget. This is a negative result for the headline claim as
-originally stated.**
-
-Misheard-word recall, 60 listeners, seed 202, base rate 0.353:
-
-### Per-listener budget — what a deployment actually does
-
-| strategy | B=10 % | 20 % | 30 % | 50 % | worst listener @20 % |
-|---|---|---|---|---|---|
-| random | 0.099 | 0.203 | 0.305 | 0.502 | 0.103 |
-| word_length (non-personalized) | 0.134 | 0.253 | 0.371 | 0.591 | 0.103 |
-| model: `word_context_only` | 0.135 | 0.259 | 0.381 | 0.591 | 0.103 |
-| model: `pta_only` | 0.134 | 0.261 | 0.379 | 0.591 | 0.103 |
-| model: `clinical` | 0.134 | 0.260 | 0.381 | 0.591 | 0.103 |
-| model: `clinical_plus_confusion` | 0.130 | 0.255 | 0.373 | 0.592 | **0.111** |
-
-### Pooled budget — reported as a mechanism contrast, not as deployment
-
-| strategy | B=10 % | 20 % | 30 % | 50 % | worst listener @20 % |
-|---|---|---|---|---|---|
-| random | 0.103 | 0.204 | 0.306 | 0.510 | 0.109 |
-| word_length | 0.136 | 0.257 | 0.371 | 0.590 | 0.069 |
-| model: `word_context_only` | 0.137 | 0.259 | 0.377 | 0.590 | 0.037 |
-| model: `pta_only` | 0.227 | 0.397 | 0.523 | 0.730 | **0.000** |
-| model: `clinical` | 0.225 | 0.405 | 0.540 | 0.745 | **0.000** |
-| model: `clinical_plus_confusion` | 0.228 | 0.411 | 0.550 | 0.754 | **0.000** |
-
-**Mechanism.** The two tables differ because of a structural fact, not a modelling
-accident: **features that are constant within a listener cannot change the within-listener
-ranking.** PTA, SRT and WRS are listener-level constants, so under a per-listener budget
-they are exactly inert — which is why `pta_only`, `clinical` and `word_context_only` are
-indistinguishable in the first table. Under a pooled budget they become powerful, because
-the model can direct the whole budget toward the listeners who mishear most.
-
-That pooled advantage is not free: it drives the **worst-served listener's recall to
-0.000**. Aggregate recall alone would have reported this as a large win. `select_budget`
-and `recall_by_listener` make both views mandatory, and a test asserts that the pooled
-strategy can starve an individual listener while the per-listener one cannot.
-
-**Consequence for the research plan.** The primary outcome specified in
-`docs/RESEARCH_PLAN.md` — aggregate misheard-word recall at matched caption ratio — is
-insufficient on its own. The per-listener recall distribution must be co-primary. This is
-recorded as a finding, not silently patched.
-
-**H2 is not supported** in this simulation at 100 calibration trials: personalized
-selection does not exceed a matched-budget non-personalized lexical heuristic.
+이것은 유용한 음성(negative) 결과입니다. 음소 독립 곱은 쓸 만한 *순위* 신호이자
+심각하게 잘못 보정된 *확률*입니다. **확률 임계값 자막 정책에 직접 투입해서는 안 됩니다.**
+등장회귀(isotonic) 보정이 ECE와 Brier를 모두 낮춘다는 사실은 테스트로 강제됩니다.
 
 ---
 
-## 5. RQ3 — personalized versus global threshold
+## 4. RQ2 — 동일 자막 비율에서 개인화 순위가 베이스라인을 이기는가?
 
-**Answer (synthetic): a global threshold wins on aggregate recall and loses badly on
-equity. The aggregate comparison alone is misleading.**
+**답 (합성): 무작위는 이기지만, 청취자별 예산 조건에서 단순 단어길이 휴리스틱을 이기지
+못합니다. 원래 서술된 형태의 주장에 대한 음성 결과입니다.**
 
-Target overall caption ratio 20 %, 60 listeners, seed 202:
+오청 단어 재현율. 청취자 60명 · 시드 202 · 기저율 0.353.
 
-| policy | achieved ratio | aggregate recall | median per-listener recall | worst listener |
+### 청취자별 예산 — 실제 배포가 하는 방식
+
+| 전략 | B=10 % | 20 % | 30 % | 50 % | 최하위 청취자 @20 % |
+|---|---|---|---|---|---|
+| 무작위 | 0.099 | 0.203 | 0.305 | 0.502 | 0.103 |
+| 단어길이 (비개인화) | 0.134 | 0.253 | 0.371 | 0.591 | 0.103 |
+| 모델 `word_context_only` | 0.135 | 0.259 | 0.381 | 0.591 | 0.103 |
+| 모델 `pta_only` | 0.134 | 0.261 | 0.379 | 0.591 | 0.103 |
+| 모델 `clinical` | 0.134 | 0.260 | 0.381 | 0.591 | 0.103 |
+| 모델 `clinical_plus_confusion` | 0.130 | 0.255 | 0.373 | 0.592 | **0.111** |
+
+### 통합(pooled) 예산 — 배포가 아니라 메커니즘 대조용
+
+| 전략 | B=10 % | 20 % | 30 % | 50 % | 최하위 청취자 @20 % |
+|---|---|---|---|---|---|
+| 무작위 | 0.103 | 0.204 | 0.306 | 0.510 | 0.109 |
+| 단어길이 | 0.136 | 0.257 | 0.371 | 0.590 | 0.069 |
+| 모델 `word_context_only` | 0.137 | 0.259 | 0.377 | 0.590 | 0.037 |
+| 모델 `pta_only` | 0.227 | 0.397 | 0.523 | 0.730 | **0.000** |
+| 모델 `clinical` | 0.225 | 0.405 | 0.540 | 0.745 | **0.000** |
+| 모델 `clinical_plus_confusion` | 0.228 | 0.411 | 0.550 | 0.754 | **0.000** |
+
+**메커니즘.** 두 표가 다른 이유는 모델링 우연이 아니라 구조적 사실입니다.
+**청취자 내부에서 상수인 특징은 청취자 내 순위를 바꿀 수 없습니다.** PTA·SRT·WRS는
+청취자 수준 상수이므로 청취자별 예산에서는 정확히 무력합니다 — 첫 표에서
+`pta_only`·`clinical`·`word_context_only`가 구별되지 않는 이유입니다. 통합 예산에서는
+모델이 오청이 많은 청취자에게 예산 전체를 몰아줄 수 있으므로 강력해집니다.
+
+그 통합 이득은 공짜가 아닙니다. **최하위 청취자의 재현율을 0.000으로 만듭니다.**
+총합 재현율만 보면 이것이 큰 승리로 보고됩니다. `select_budget()`와
+`recall_by_listener()`가 두 관점을 모두 강제하며, 통합 전략이 개별 청취자를 굶길 수
+있고 청취자별 전략은 그럴 수 없다는 것을 테스트가 검증합니다.
+
+**연구 계획에 대한 함의.** `docs/RESEARCH_PLAN.md`가 지정한 1차 성과지표 —
+동일 자막 비율에서의 총합 오청 단어 재현율 — 은 **그 자체만으로는 불충분**합니다.
+청취자별 재현율 분포가 공동 1차 지표여야 합니다. 이를 조용히 수정하지 않고 발견으로
+기록합니다.
+
+**H2는 이 시뮬레이션(교정 100시행)에서 지지되지 않습니다.**
+
+---
+
+## 5. RQ3 — 개인화 임계값 vs 전역 임계값
+
+**답 (합성): 전역 임계값이 총합 재현율에서 이기고 형평성에서 크게 집니다. 총합 비교만으로는
+오도됩니다.**
+
+목표 전체 자막 비율 20 % · 청취자 60명 · 시드 202:
+
+| 정책 | 달성 비율 | 총합 재현율 | 청취자별 재현율 중앙값 | 최하위 청취자 |
 |---|---|---|---|---|
-| single global τ | 0.200 | **0.411** | 0.000 | 0.000 |
-| per-listener τ (quantile) | 0.201 | 0.255 | **0.257** | **0.111** |
+| 단일 전역 τ | 0.200 | **0.411** | 0.000 | 0.000 |
+| 청취자별 τ (분위수) | 0.201 | 0.255 | **0.257** | **0.111** |
 
-A single threshold spends nearly the whole caption budget on high-risk listeners: **half
-the listeners receive essentially no captions at all** (median per-listener recall 0.000)
-while the aggregate number looks strong. The per-listener threshold delivers the same total
-caption volume with every listener served.
+단일 임계값은 자막 예산 거의 전부를 고위험 청취자에게 씁니다. **청취자의 절반이 자막을
+사실상 전혀 받지 못하면서**(청취자별 재현율 중앙값 0.000) 총합 수치는 좋아 보입니다.
+청취자별 임계값은 같은 총 자막량으로 모든 청취자를 서비스합니다.
 
-**H3 as originally phrased is not supported** — a personalized threshold does not improve
-the aggregate misunderstanding-versus-volume frontier. On the equity criterion it is
-clearly preferable, and that is the criterion that matches the accessibility purpose of the
-system. Both numbers are reported; neither is suppressed.
+**H3은 원래 서술대로는 지지되지 않습니다** — 개인화 임계값이 총합 오해–자막량 프런티어를
+개선하지 않습니다. 형평성 기준에서는 명확히 우수하며, 이는 본 시스템의 접근성 목적에
+부합하는 기준입니다. 두 수치를 모두 보고하고 어느 쪽도 숨기지 않습니다.
 
 ---
 
-## 6. Open questions and the highest-value missing experiment
+## 6. 미해결 질문과 가장 가치 있는 미실행 실험
 
-1. **Ma et al. (2026) analyse 16 nuclei.** AUDIRE uses the full orthographic 21. The basis
-   for the reduction is not reconstructible from the material available to this project.
-   Recorded as open rather than guessed at (ADR-0004).
-2. **Idiosyncrasy × calibration length — not yet run.** The RQ2 negative result may be a
-   property of the method *or* of two chosen values: `dirichlet_concentration = 40`
-   (how much listeners differ beyond their ability) and 100 calibration trials. Sweeping
-   both determines whether personalized selective captioning has a regime where it pays
-   off, and where that regime begins. This is the single most informative remaining
-   experiment and is why `docs/TASKS.md` ranks it first.
-3. **The Kim et al. (2015) reliability ceiling stands.** WRS test–retest r falls 0.88 → 0.76
-   → 0.61 from 50 to 25 to 10 words, with a ±26.22-point 95 % prediction interval at 10
-   words. No AUDIRE calibration-length result may claim that a short custom test is
-   equivalent to a standardized clinical WRS.
+1. **Ma et al. (2026)은 중성 16개를 분석**합니다. AUDIRE는 정서법상 21개 전체를 씁니다.
+   축소의 근거는 본 과제가 접근 가능한 자료로는 재구성할 수 없습니다. 추측하지 않고
+   미해결로 기록합니다(ADR-0004).
+2. **개인 특이성 × 교정 길이 스윕 — 미실행.** RQ2의 음성 결과는 방법의 성질일 수도,
+   선택된 두 값(`dirichlet_concentration = 40`, 교정 100시행)의 성질일 수도 있습니다.
+   두 축을 스윕하면 개인화 선택 자막이 이득을 내는 영역이 존재하는지, 그 경계가 어디인지
+   결정됩니다. **남은 실험 중 가장 정보량이 큽니다.**
+3. **Kim et al. (2015)의 신뢰도 천장은 유효**합니다. WRS 검사–재검사 r은 50→25→10단어에서
+   0.88 → 0.76 → 0.61로 떨어지고, 10단어에서 95 % 예측구간은 ±26.22점입니다.
+   어떤 교정 길이 결과도 짧은 맞춤 검사가 표준화 임상 WRS와 동등하다고 주장할 수 없습니다.
 
 ---
 
-## 7. Falsification status
+## 7. 반증(falsification) 상태
 
-From `docs/RESEARCH_PLAN.md`, AUDIRE should be considered unsupported if:
+`docs/RESEARCH_PLAN.md`가 정한 반증 조건 대비:
 
-| criterion | status in this simulation |
+| 조건 | 본 시뮬레이션에서의 상태 |
 |---|---|
-| confusion features do not improve held-out prediction beyond clinical baselines | **not triggered** — small but reliable improvement (+0.006 PR-AUC, CI excludes 0) |
-| selective captions fail to beat random/non-personalized at matched budgets | **partially triggered** — beats random, does not beat word-length at a per-listener budget |
-| probabilities are badly miscalibrated and cannot be corrected | **not triggered** for the fitted models (ECE 0.005); **triggered** for raw `R_phon` (ECE 0.468), which calibration repairs |
-| improvements disappear under listener-level cross-validation | **not triggered** — all results above are listener-level out-of-fold |
+| 혼동 특징이 임상 베이스라인을 넘어 예측을 개선하지 못함 | **미발동** — 작지만 신뢰할 수 있는 개선(+0.006 PR-AUC, CI가 0 제외) |
+| 동일 예산에서 무작위/비개인화를 이기지 못함 | **부분 발동** — 무작위는 이기나 청취자별 예산에서 단어길이를 못 이김 |
+| 확률이 심하게 잘못 보정되고 교정 불가 | 적합 모델은 **미발동**(ECE 0.005). 원시 `R_phon`은 **발동**(ECE 0.468), 보정으로 복구됨 |
+| 청취자 수준 교차검증에서 개선이 사라짐 | **미발동** — 위 결과 전부가 청취자 수준 out-of-fold |
 
-Two of four falsification criteria are therefore partially met. The honest summary is that
-the *prediction* claim survives in weakened form, while the *selective-captioning benefit*
-claim does not survive in the form originally stated, pending the idiosyncrasy sweep and,
-ultimately, human data.
+네 조건 중 두 개가 부분적으로 발동했습니다. 정직한 요약은 다음과 같습니다:
+**예측 주장은 약화된 형태로 살아남았고, 선택 자막 이득 주장은 원래 서술된 형태로는
+살아남지 못했습니다.** 개인 특이성 스윕과 궁극적으로는 사람 데이터가 필요합니다.
+
+---
+
+## 8. 모델 학습 및 시스템 검증 지표 요약
+
+| 항목 | 값 |
+|---|---|
+| 최종 선택 모델 | 로지스틱 회귀 (L2, `C=1.0`) — 경험적 근거로 비선형 모델 대비 우위 |
+| 특징 수 | `word_context_only` 14 · `pta_only` 24 · `confusion_only` 30 · `clinical` 34 · `clinical_plus_confusion` 50 |
+| 학습 데이터 (시드당) | 청취자 80명 × 단어 250시행 = 20,000행 |
+| 분할 방식 | 청취자 수준 층화 5-폴드 (누출 검사 매 폴드 실행) |
+| 결측 처리 | 파이프라인 내부 중앙값 대치 + 결측 표시 열 |
+| 최고 PR-AUC | 0.6666 (유병률 바닥값 0.3494) |
+| 최고 ROC-AUC | 0.7796 |
+| 최저 Brier | 0.1753 |
+| 최저 ECE (10구간) | 0.0049 |
+| 부트스트랩 | 청취자 재표집 1000회 |
+| 자막 감소율 (CRR) @B=20 % | 0.80 |
+| 테스트 | 321개 통과 |
+| 타입 검사 | `mypy --strict` 55개 파일 무오류 |
+| 분기 커버리지 | 핵심 모듈 89–100 % |
