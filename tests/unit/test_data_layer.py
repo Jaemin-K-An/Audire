@@ -37,6 +37,7 @@ def test_registry_parses_and_contains_the_declared_sources() -> None:
     assert set(reg.literature) == {
         "joo2026_error_rates",
         "ma2026_similarity",
+        "who2021_hearing_grades",
         "kim2015_ksmwla_reliability",
     }
 

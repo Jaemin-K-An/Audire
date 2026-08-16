@@ -151,6 +151,24 @@ literature:
       perceptual distance shrinkage with hearing level)
     do_not: treat reported group means as individual-listener matrices
 
+  - id: who2021_hearing_grades
+    doi: null
+    title: World report on hearing / Deafness and hearing loss fact sheet
+    authors: World Health Organization
+    journal: WHO
+    year: 2021
+    volume_issue_pages: "n/a"
+    url: https://www.who.int/news-room/fact-sheets/detail/deafness-and-hearing-loss
+    accessed: 2026-08-16
+    use: >-
+      Named, citable severity-stratum boundaries used to stratify synthetic listeners and
+      to report subgroup results. Grades (better-ear average, dB HL): normal <20,
+      mild 20-34, moderate 35-49, moderately severe 50-64, severe 65-79,
+      profound 80-94, complete/total >=95.
+    do_not: >-
+      present a stratum label as a diagnosis, a degree-of-disability finding, or a
+      clinical assessment of any individual
+
   - id: kim2015_ksmwla_reliability
     doi: 10.7874/jao.2015.19.2.68
     title: >-
