@@ -1,41 +1,64 @@
-# Structured Hearing-Expert Consultation Protocol
+# 구조화된 청각 전문가 자문 프로토콜
 
-## Purpose
-Use the expert as a clinical-methodology adviser and validation source, not as a substitute for participant data.
+> **상태: 미시행.** 이 프로토콜은 준비되었으나 전문가 검토는 실시되지 않았습니다.
+> 어떤 전문가 결과도 존재하지 않으며, 실시 전에 결과를 보고하는 것은 날조입니다.
 
-## Session 1 — construct validity
-Ask and record rationale for:
-1. In clinical practice, how often do people with similar pure-tone thresholds show materially different WRS or real-world speech discrimination?
-2. What does PTA capture well, and what does it fail to capture about speech perception?
-3. How should SRT be interpreted alongside PTA? What discrepancies are clinically meaningful enough to trigger caution?
-4. When is a single-level WRS insufficient, and when is PBmax / a performance-intensity function useful?
-5. How do MCL/UCL and hearing-aid use affect speech-test interpretation?
-6. Which Korean consonant/vowel/coda confusions are commonly observed, and under what conditions?
-7. Would an individual confusion matrix add information not represented by WRS alone?
+## 목적
+전문가를 참여자 데이터의 대체물이 아니라 **임상 방법론 자문자이자 검증 출처**로
+활용합니다.
 
-## Session 2 — calibration design
-Review:
-- stimulus count and fatigue
-- male/female speaker balance
-- presentation level and calibration
-- whether MCL-based presentation is appropriate for the project
-- response capture method
-- hearing-aid on/off policy
-- quiet versus noise conditions
-- phoneme coverage and especially Korean tense/lax/aspirated contrasts
+## 세션 1 — 구성 타당도
+다음을 묻고 근거를 기록합니다:
+1. 임상에서 순음 역치가 비슷한 사람들이 WRS나 실생활 어음 변별에서 실질적으로 다른 경우가
+   얼마나 자주 있습니까?
+2. PTA가 어음 지각에 대해 잘 포착하는 것과 포착하지 못하는 것은 무엇입니까?
+3. SRT는 PTA와 함께 어떻게 해석해야 합니까? 어느 정도의 불일치가 주의를 요할 만큼
+   임상적으로 유의합니까?
+4. 단일 강도 WRS가 불충분한 경우는 언제이며, PBmax / 어음명료도 곡선이 유용한 경우는
+   언제입니까?
+5. MCL/UCL과 보청기 착용은 어음 검사 해석에 어떤 영향을 줍니까?
+6. 어떤 한국어 자음/모음/받침 혼동이 흔히 관찰되며, 어떤 조건에서 그렇습니까?
+7. 개인 혼동행렬은 WRS 단독으로는 표현되지 않는 정보를 더합니까?
 
-Require the expert to flag any procedure that would be clinically misleading.
+## 세션 2 — 교정 설계
+검토 항목:
+- 자극 수와 피로
+- 남녀 화자 균형
+- 제시 강도와 음압 교정
+- MCL 기준 제시가 본 과제에 적절한지
+- 반응 수집 방법
+- 보청기 착용/미착용 정책
+- 조용한 조건 대 소음 조건
+- 음소 포괄성, 특히 한국어 경음·평음·격음 대립
 
-## Session 3 — model/UI validation
-Provide blinded examples containing profile summary, target word, predicted risk and explanation. Ask the expert to rate 1–5:
-- plausibility of risk level
-- plausibility of implicated phoneme(s)
-- usefulness of selective caption decision
-- risk of misleading interpretation
+**임상적으로 오도할 수 있는 절차는 전문가가 반드시 지적하도록 요구합니다.**
 
-Collect free-text rationale for disagreements.
+### 세션 2에서 반드시 제시할 제약
+AUDIRE의 내장 자극은 브라우저 음성합성으로 재생되며 **음압 교정이 되어 있지 않습니다.**
+전문가에게 이 사실을 명시하고, 그 조건에서 수집된 교정이 무엇을 의미할 수 있고
+무엇을 의미할 수 없는지 판단을 요청하십시오.
 
-## Reporting constraints
-- Report credentials and years of experience only with permission.
-- Do not call a one-expert review a Delphi study, consensus, or clinical validation trial.
-- Preserve disagreements and model failures.
+## 세션 3 — 모델/UI 검증
+프로파일 요약·목표 단어·예측 위험·설명을 담은 **블라인드 예시**를 제공합니다.
+전문가에게 1–5점으로 평정을 요청합니다:
+- 위험 수준의 타당성
+- 지목된 음소의 타당성
+- 선택 자막 결정의 유용성
+- 오해를 유발할 위험
+
+이견에 대해서는 자유 기술 근거를 수집합니다.
+
+### 세션 3에서 반드시 제시할 결과
+`docs/RESULTS.md`의 다음 발견을 함께 제시하고 해석을 요청하십시오:
+- 혼동행렬이 PTA+SRT+WRS 대비 더한 예측 증가분이 작습니다(ΔPR-AUC +0.006).
+  임상 실무 관점에서 이 크기는 의미가 있습니까?
+- 청취자별 자막 예산에서 개인화가 단어길이 휴리스틱을 이기지 못했습니다.
+  이것이 접근성 관점에서 무엇을 시사합니까?
+- 전역 임계값은 총합 재현율이 높지만 청취자 절반이 자막을 거의 받지 못합니다.
+  임상·접근성 관점에서 어느 정책이 옳습니까?
+
+## 보고 제약
+- 자격과 경력 연수는 **허락이 있을 때에만** 보고합니다.
+- 1인 전문가 검토를 델파이 연구, 합의, 임상 검증 시험으로 부르지 마십시오.
+- **이견과 모델 실패를 보존하십시오.**
+- 전문가가 동의하지 않은 내용을 전문가의 견해로 제시하지 마십시오.

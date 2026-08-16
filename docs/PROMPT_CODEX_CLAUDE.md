@@ -1,136 +1,120 @@
-# Master Agent Prompt — Project AUDIRE
+# 마스터 에이전트 프롬프트 — Project AUDIRE
 
-You are the principal research engineer for **Project AUDIRE**. Work directly in this repository until the completion contract in `AGENTS.md` is satisfied.
+> **보관용 문서.** 이 프로젝트를 개시한 원래 위탁 내용의 한국어판입니다.
+> 실행 계약의 정본은 `AGENTS.md`이며, 두 문서가 어긋나면 `AGENTS.md`가 우선합니다.
+> 영문 원본은 커밋 이력에 보존되어 있습니다.
 
-## Project objective
-Build a finished, reproducible system for **Personalized Prediction of Korean Word Misrecognition for Selective Captioning**.
+## 프로젝트 목표
+**개인 어음인지 프로파일 기반 한국어 오청 예측 및 선택 자막**을 위한, 완성되고 재현
+가능한 시스템을 구축한다.
 
-The system must combine:
-- pure-tone hearing profile / PTA
+시스템은 다음을 결합해야 한다:
+- 순음 청력 프로파일 / PTA
 - SRT
-- WRS (and PBmax/PI-function when available)
-- an individual onset/nucleus/coda Korean phoneme confusion matrix
-- Korean ASR with word timestamps
+- WRS (가능하면 PBmax/어음명료도 곡선)
+- 개인별 초성/중성/종성 한국어 음소 혼동행렬
+- 단어 타임스탬프를 갖는 한국어 ASR
 
-to estimate `P(word misheard | listener, word, context)` and display only words selected by a transparent probability-threshold or caption-budget policy.
+이를 통해 `P(단어 오청 | 청취자, 단어, 맥락)`을 추정하고, 투명한 확률 임계값 또는 자막
+예산 정책이 선택한 단어만 표시한다.
 
-This is not a demo assignment. Do not stop after a notebook, CLI proof, mock web page, synthetic-only result, or one happy-path audio file.
+**이것은 데모 과제가 아니다.** 노트북, CLI 증명, 목업 웹페이지, 합성 전용 결과, 정상
+경로 오디오 파일 하나에서 멈추지 말 것.
 
-## First actions
-1. Read `AGENTS.md`, `docs/RESEARCH_PLAN.md`, `docs/DATA_REGISTRY.md`, `docs/EXPERIMENT_PLAN.md` and `data/sources.yaml`.
-2. Inspect the repository and create the missing single-source-of-truth documents required by the harness.
-3. Create a risk register: scientific validity, data availability, license constraints, ASR timestamp quality, participant-data privacy, leakage, calibration length and UI safety.
-4. Verify every external dependency/data source from its current official documentation before pinning.
-5. Implement the data acquisition/manifest layer before model development.
+## 요구 연구 설계
+근거가 문서화된 변경을 강제하지 않는 한 다음을 사전등록된 1차 비교로 취급한다.
 
-## Required research design
-Treat these as preregistered primary comparisons unless evidence forces a documented change:
+**RQ1** — 개인 음소 혼동 정보가 순음청력도 단독 및 PTA+SRT+WRS 베이스라인을 넘어
+홀드아웃 청취자의 단어 오청 예측을 개선하는가?
 
-**RQ1** — Does individual phoneme-confusion information improve held-out listener word-mishearing prediction beyond audiogram-only and PTA+SRT+WRS baselines?
+**RQ2** — 동일 자막 비율에서 개인화 위험 순위가 무작위 및 비개인화 베이스라인보다 실제
+오청 단어를 더 많이 포착하는가?
 
-**RQ2** — At matched caption ratios, does personalized risk ranking capture more true misheard words than random and non-personalized baselines?
+**RQ3** — 개인화 임계값/예산 정책이 오해 대 자막량 파레토 프런티어를 개선하는가?
 
-**RQ3** — Does a personalized threshold/budget policy improve the misunderstanding-versus-caption-volume Pareto frontier?
+**청취자 수준 교차검증을 사용한다.** 같은 청취자의 반복 시행이 학습/평가에 걸쳐 누출되지
+않게 한다.
 
-Use listener-level cross-validation. Prevent repeated trials from the same listener leaking across train/test.
+최소 모델 계열: 결정론적 음소 독립 위험, PTA/순음청력도 베이스라인, PTA+SRT+WRS
+베이스라인, 혼동 전용 모델, 결합 임상+혼동 확률 모델, 표본이 허용하면 정당화된 비선형
+비교 모델 1개.
 
-Minimum model family:
-- deterministic phoneme independence risk
-- PTA/audiogram baseline
-- PTA+SRT+WRS baseline
-- confusion-only model
-- combined clinical+confusion probabilistic model
-- one justified nonlinear comparator if sample size permits
+**분류 정확도만이 아니라 확률 보정을 평가한다.**
 
-Evaluate probability calibration, not only classification accuracy.
+## 합성 시뮬레이션
+설정 기반 몬테카를로 시뮬레이터를 구축해 합성 청취자, 순음청력도, SRT/WRS 값, 혼동행렬,
+지각 단어 결과를 생성한다. **출처가 존재하는 경우에만** 문헌 기반 사전분포를 사용한다.
+생성된 모든 행에 합성 표시를 남긴다.
 
-## Synthetic simulation
-Build a config-driven Monte Carlo simulator that can generate synthetic listeners, audiograms, SRT/WRS values, confusion matrices and perceived-word outcomes. Use literature-informed priors only where a source exists. Mark every generated row as synthetic.
+참여자 수, 교정 길이, WRS 대역, 청력 중증도, SNR, 자막 예산에 대해 민감도 스윕을 실행한다.
+실행 설정, 시드, git SHA, 데이터 매니페스트, 결과를 영속화한다.
 
-Run sensitivity sweeps across participant count, calibration length, WRS band, hearing severity, SNR and caption budget. Persist run configs, seeds, git SHA, data manifests and results.
+**합성 시뮬레이션은 코드를 검증하고 설계 민감도를 추정할 수 있으나, 결코 임상 검증으로
+기술되어서는 안 된다.**
 
-Synthetic simulation may validate code and estimate design sensitivity, but it must never be described as clinical validation.
+## 실제/공개 데이터 전략
+`docs/DATA_REGISTRY.md`와 `data/sources.yaml` 참조. 핵심 원칙:
 
-## Real/public data strategy
-Use the data registry as follows:
+1. **한국어 단음절 말지각검사 데이터셋** — 1차 교정 자극, 726행. CC BY-NC-ND 4.0과
+   제작자 통보 요청을 존중한다. 원시/변형 음원을 커밋하지 않는다.
+2. **Zeroth-Korean** — ASR·종단 자막 테스트용 CC BY 4.0 한국어 문장 코퍼스.
+   결정론적 CI에는 고정된 테스트 부분집합을 선호한다.
+3. **Zenodo 17091997 청각학 데이터베이스** — 보조 스키마/민감도 출처에 한정.
+   사용 전 실제 라이선스 메타데이터를 읽고 영속화한다.
+   그 어음 라벨을 한국어 음소 혼동에 직접 대응시키지 않는다.
+4. **2026년 한국어 오류 분석 논문** — 문헌 사전분포/타당성 검사 출처.
+   확보할 수 없는 참여자 단위 데이터를 지어내지 않는다.
+5. **KS-MWL-A/WRS 신뢰도 논문** — WRS/SRT 구성 정의와 단축 검사 신뢰도 제약에 사용한다.
 
-1. **Korean Monosyllabic Speech Perception Test Dataset** — primary calibration stimuli, 726 rows. Respect CC BY-NC-ND 4.0 and the dataset-card instruction to inform the creator of intended use/scope. Never commit raw/modified audio.
-2. **Zeroth-Korean** — CC BY 4.0 Korean sentence corpus for ASR and end-to-end caption tests. Prefer a pinned test subset for deterministic CI.
-3. **Zenodo 17091997 audiology database** — auxiliary schema/sensitivity source only. Read and persist actual license metadata before use. Do not map its speech labels directly to Korean phoneme confusion.
-4. **2026 Korean error-analysis papers (10.21848/asr.250214, 10.21848/asr.250216)** — literature prior/sanity-check source. Do not invent unavailable participant-level data. If manually transcribing aggregate table values, double-verify and record table/page provenance.
-5. **KS-MWL-A/WRS reliability paper (10.7874/jao.2015.19.2.68)** — use for WRS/SRT construct definitions and shortened-test reliability constraints.
+**필수 참여자 단위 데이터셋이 확보되지 않으면 두 경로를 구현한다:**
+(a) 완전한 합성/연구 경로, (b) 개인의 응답을 로컬에서 수집해 혼동 프로파일을 만드는
+실제 교정 워크플로. 최종 애플리케이션은 비공개 원시 임상 데이터가 공개되어 있는 척하지
+않으면서 동작해야 한다.
 
-If an essential participant-level dataset is unavailable, implement two paths: (a) a complete synthetic/research path, and (b) a real calibration workflow that collects an individual's responses locally and creates their confusion profile. The final application must work without pretending that private raw clinical data is public.
+## 청각 전문가 통합
+`docs/EXPERT_PROTOCOL.md`를 준비하고 사용한다. 전문가 입력을 문서화된 설계 결정,
+모델 설명에 대한 구조화된 타당성 검토, 한계로 전환한다.
 
-## Hearing-expert integration
-Prepare and use `docs/EXPERT_PROTOCOL.md`. Convert expert input into:
-- documented design decisions,
-- a structured plausibility review of model explanations,
-- limitations.
+**전문가 1인을 합의나 임상 효능 근거로 과대 진술하지 않는다.**
 
-Do not overstate one expert as consensus or clinical efficacy evidence.
+## 제품 요구사항
+최종 평가자가 다음을 할 수 있어야 한다: 청력 프로파일 생성/가져오기, 검증된 PTA/SRT/WRS
+필드와 출처 확인, 한국어 단음절 교정 세션 실행 및 응답 로컬 저장, 빈도와 불확실성/평활을
+갖는 초성/중성/종성 혼동행렬 획득, 한국어 WAV/MP3/MP4 업로드, 단어 타임스탬프와 함께 전사,
+단어별 개인화 오청 위험 계산, 각 단어가 강조되거나 되지 않은 이유 확인,
+전체 자막·임계값 기반 선택 자막·고정 예산 선택 자막 간 전환, SRT/ASS/JSON 내보내기,
+연구 평가 실행 및 설정으로부터 그림/표 재생성.
 
-## Product requirements
-A final evaluator must be able to:
-1. create or import a hearing profile;
-2. see validated PTA/SRT/WRS fields and provenance;
-3. run a Korean monosyllabic calibration session and save responses locally;
-4. obtain onset/nucleus/coda confusion matrices with counts and uncertainty/smoothing;
-5. upload Korean WAV/MP3/MP4;
-6. transcribe with word timestamps;
-7. compute per-word personalized mishearing risk;
-8. see why each word was or was not highlighted;
-9. switch among full caption, threshold-based selective caption, and fixed-budget selective caption;
-10. export SRT, ASS and JSON;
-11. run research evaluation and regenerate figures/tables from configs.
+ASR 모델 부재, 잘못된 미디어, 불완전한 프로파일, 불충분한 교정 데이터에 대한 안전한 실패
+동작을 포함한다.
 
-Include safe failure behavior for missing ASR model, bad media, incomplete profile and insufficient calibration data.
+## 공학 요구사항
+타입이 붙은 Python, 현대적 패키징과 락파일, 재현 가능한 CPU 경로(GPU 선택),
+모듈식 ASR 어댑터, FastAPI 또는 동등하게 안정적인 로컬 API, 목업 스크린샷이 아닌 실사용
+가능한 브라우저 UI, 구조화된 로깅, 매직 상수가 아닌 설정 파일, 결정론적 시드,
+CI에 들어갈 만큼 작은 테스트 픽스처, 속성 기반 한글 테스트, 단위/통합/E2E 테스트,
+린트/타입/테스트/보안/스모크 CI, 저장소에 비밀키 없음, 저장소에 원시 참여자 데이터 없음,
+설치/테스트/데이터/평가/실행/재현을 위한 원커맨드 진입점.
 
-## Engineering requirements
-- typed Python, modern packaging and lockfile
-- reproducible CPU path; GPU optional
-- modular ASR adapter
-- FastAPI or comparably stable local API
-- usable browser UI, not a mock screenshot
-- structured logging
-- config files, not magic constants
-- deterministic seeds
-- test fixtures small enough for CI
-- property-based Hangul tests
-- unit/integration/E2E tests
-- CI for lint/type/test/security/smoke
-- no secret keys in repo
-- no raw participant data in repo
-- one-command commands for install/test/data/eval/run/reproduce, implemented through Makefile/just/task runner
+## 과학적 인수 기준
+최종 보고서에 포함할 것: 데이터셋/출처 표, 흐름도, 베이스라인 및 절제 표,
+변별 + 보정 지표, 자막 예산 파레토 그림, 교정 길이 민감도 그림, 하위군/오류 분석,
+청취자 위험 오류와 분리된 ASR 오류, 전문가 검토 요약, **한계와 음성 결과.**
 
-## Scientific acceptance criteria
-The final report must include:
-- dataset/provenance table
-- flow diagram
-- baseline and ablation tables
-- discrimination + calibration metrics
-- caption-budget Pareto plot
-- calibration-length sensitivity plot
-- subgroup/error analysis
-- ASR error separated from listener-risk error
-- expert review summary
-- limitations and negative results
+**최선의 시드를 체리피킹하지 않는다.** 사전등록된 설정과 신뢰구간을 사용한다.
 
-Do not cherry-pick the best seed. Use preregistered configs and confidence intervals.
+## 중단 조건
+작업이 어렵다는 이유만으로 중단하고 사람에게 묻지 않는다. 가용한 최선의 근거로 계속하고
+차단 요인을 기록한다. 다음의 경우에만 중단한다:
+- 추론할 수 없는 임상/윤리적 승인이 필요할 때
+- 데이터셋이 사람의 수락/연락 단계를 요구할 때(요구되는 정확한 조치를 기록하고 나머지
+  시스템은 계속 동작하게 한다)
+- 자격 증명/비밀키가 필요할 때
 
-## Stop conditions
-Do not stop and ask the human merely because a task is difficult. Continue using the best available evidence and record blockers. Stop only when:
-- a decision genuinely requires clinical/ethical authorization that cannot be inferred;
-- a dataset requires a human acceptance/contact step (record the exact required action and keep the rest of the system working);
-- credentials/secrets are required.
+## 최종 완료 보고
+모든 게이트가 완료되면 검증 가능한 근거만 보고한다: 실행한 명령과 종료 상태, 테스트 수,
+아티팩트 경로를 갖는 연구 지표, 시스템 E2E 시나리오 결과, 미해결 한계, 정확한 릴리스/커밋
+식별자.
 
-## Final completion response
-When all gates are complete, report only verifiable evidence:
-- commands run and exit status
-- test counts
-- research metrics with artifact paths
-- system E2E scenario results
-- unresolved limitations
-- exact release/commit identifiers
-
-Do not call the project complete unless every item in `AGENTS.md` Definition of Done passes on a fresh environment.
+**`AGENTS.md`의 완료 정의 전 항목이 새 환경에서 통과하지 않는 한 프로젝트를 완료로
+부르지 않는다.**

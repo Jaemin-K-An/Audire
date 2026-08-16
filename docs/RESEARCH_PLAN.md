@@ -1,134 +1,152 @@
-# AUDIRE Research Plan
+# AUDIRE 연구 계획
 
-## Working title
-**Personalized Prediction of Korean Word Misrecognition for Selective Captioning**
+## 제목
+**개인 어음인지 프로파일 기반 한국어 오청 예측 및 선택 자막**
 
-Korean: **개인 어음인지 프로파일 기반 한국어 오청 예측 및 선택 자막**
+영문: **Personalized Prediction of Korean Word Misrecognition for Selective Captioning**
 
-## Core claim to test
-A user's speech-perception profile — especially an **individual phoneme confusion matrix** — should predict word-level Korean mishearing risk better than an audiogram-only or clinical-score-only model, and this risk can drive captions that preserve high-risk information while displaying substantially less text than full captions.
+## 검정할 핵심 주장
+사용자의 어음인지 프로파일 — 특히 **개인 음소 혼동행렬** — 은 순음청력도만 쓰거나 임상
+점수만 쓰는 모델보다 단어 단위 한국어 오청 위험을 더 잘 예측해야 하며, 이 위험으로
+고위험 정보를 보존하면서 전체 자막보다 실질적으로 적은 텍스트를 표시하는 자막을 만들 수
+있어야 합니다.
 
-## Research questions
-- **RQ1**: Does adding individual phoneme confusion information to PTA/SRT/WRS improve word-level mishearing prediction over PTA-only and PTA+SRT+WRS baselines?
-- **RQ2**: At a fixed caption budget, does personalized risk ranking capture more true misheard words than non-personalized strategies?
-- **RQ3**: Does a WRS-informed or validation-optimized personal threshold improve the accuracy–caption-volume tradeoff over a global threshold?
-- **RQ4 (secondary)**: How robust is the model under changes in SNR, speaker and word/phoneme position?
+## 연구 질문
+- **RQ1**: 개인 음소 혼동 정보를 PTA/SRT/WRS에 추가하면 PTA 단독 및 PTA+SRT+WRS
+  베이스라인 대비 단어 단위 오청 예측이 개선되는가?
+- **RQ2**: 고정된 자막 예산에서 개인화 위험 순위가 비개인화 전략보다 실제 오청 단어를
+  더 많이 포착하는가?
+- **RQ3**: WRS 기반 또는 검증 최적화된 개인 임계값이 전역 임계값보다 정확도–자막량
+  절충을 개선하는가?
+- **RQ4 (부차)**: SNR·화자·단어/음소 위치 변화에 대해 모델은 얼마나 강건한가?
 
-## Hypotheses
-- H1: `clinical + confusion` yields lower Brier score / higher PR-AUC than `audiogram only` and `clinical only`.
-- H2: Personalized selective captions achieve higher misheard-word recall at matched caption ratios.
-- H3: Calibration quality degrades as the phoneme test is shortened; a principled subset-selection method retains more predictive information than random shortening.
+## 가설
+- **H1**: `임상 + 혼동`이 `순음청력도만`과 `임상만`보다 낮은 Brier 점수 / 높은 PR-AUC를
+  얻는다.
+- **H2**: 개인화 선택 자막이 동일 자막 비율에서 더 높은 오청 단어 재현율을 얻는다.
+- **H3**: 음소 검사를 짧게 할수록 보정 품질이 저하되며, 원칙 있는 부분집합 선택 방법이
+  무작위 단축보다 예측 정보를 더 많이 보존한다.
 
-## Profile definition
-For listener `u`:
+## 프로파일 정의
+청취자 `u`에 대해:
 
 `U = {audiogram_250..8000, PTA, SRT, WRS, optional_PBmax, C_u}`
 
-`C_u(i,j) = P(perceived phoneme=j | target phoneme=i, listener=u)`
+`C_u(i,j) = P(지각 음소=j | 목표 음소=i, 청취자=u)`
 
-WRS is a **global speech-recognition factor**; the confusion matrix is a **local error-structure factor**. Do not collapse them into one number.
+WRS는 **전역 어음인지 요인**이고 혼동행렬은 **국소 오류 구조 요인**입니다.
+**둘을 하나의 수치로 합치지 마십시오.**
 
-## Primary outcome
-`P(mishear word w | listener u, acoustic context e)`
+## 1차 성과지표
+`P(단어 w 오청 | 청취자 u, 음향 맥락 e)`
 
-The initial interpretable model family must include:
-1. deterministic phoneme-risk baseline
-2. logistic regression / generalized linear probabilistic model
-3. at least one nonlinear baseline if data volume supports it
-4. probability calibration comparison (Platt/isotonic or equivalent when appropriate)
+초기 모델 계열에 반드시 포함할 것:
+1. 결정론적 음소 위험 베이스라인
+2. 로지스틱 회귀 / 일반화 선형 확률 모델
+3. 데이터 규모가 지지하면 비선형 베이스라인 최소 1개
+4. 적절한 경우 확률 보정 비교(Platt/등장회귀 또는 동등물)
 
-Deep learning is not a requirement and must not be used merely to claim AI usage.
+딥러닝은 요구사항이 아니며, **AI를 쓴다고 주장하기 위해 사용해서는 안 됩니다.**
 
-## Word-risk baseline
-For phonemes `phi_k` in word `w`:
+## 단어 위험 베이스라인
+단어 `w`의 음소 `phi_k`에 대해:
 
 `R_phon(w,u) = 1 - product_k C_u(phi_k, phi_k)`
 
-This independence baseline is deliberately simple and must be tested against learned alternatives. Position (onset/nucleus/coda), repetition and phonological class should be explicit features.
+이 독립 베이스라인은 의도적으로 단순하며 학습 기반 대안과 반드시 대조되어야 합니다.
+위치(초성/중성/종성), 반복, 음운 부류는 명시적 특징이어야 합니다.
 
-## Selective-caption objective
-Two equivalent evaluation forms:
+## 선택 자막 목표
+동등한 두 평가 형태:
 
-1. **Budget form**: maximize true misheard-word recall subject to `caption_ratio <= B`.
-2. **Utility form**: minimize `alpha * misunderstanding_loss + beta * caption_ratio`.
+1. **예산 형태**: `caption_ratio <= B` 제약 하에서 실제 오청 단어 재현율 최대화.
+2. **효용 형태**: `alpha * 오해손실 + beta * 자막비율` 최소화.
 
-Report a Pareto curve rather than one cherry-picked threshold.
+단일 임계값을 체리피킹하지 말고 **파레토 곡선**을 보고할 것.
 
-## Baselines
-- B0: full captions
-- B1: random words at matched caption ratio
-- B2: lexical/content heuristic (non-personalized)
-- B3: audiogram/PTA-only risk
+## 베이스라인
+- B0: 전체 자막
+- B1: 동일 자막 비율의 무작위 단어
+- B2: 어휘/내용어 휴리스틱(비개인화)
+- B3: 순음청력도/PTA 기반 위험
 - B4: PTA + SRT + WRS
-- **AUDIRE**: B4 + individualized confusion features
+- **AUDIRE**: B4 + 개인화 혼동 특징
 
-## Evaluation metrics
-Prediction:
-- PR-AUC (primary for imbalanced errors)
+## 평가 지표
+예측:
+- PR-AUC (불균형 오류에 대한 1차 지표)
 - ROC-AUC
-- Brier score
-- log loss
-- Expected Calibration Error
-- sensitivity/recall, specificity, precision, F1
+- Brier 점수
+- 로그 손실
+- 기대 보정 오차(ECE)
+- 민감도/재현율, 특이도, 정밀도, F1
 
-Caption utility:
-- misheard-word recall at 10/20/30/40/50% caption budgets
-- Caption Reduction Ratio
-- weighted information recall if semantic importance is later added
-- end-to-end ASR + risk pipeline failure rate
+자막 효용:
+- 10/20/30/40/50 % 자막 예산에서의 오청 단어 재현율
+- 자막 감소율(Caption Reduction Ratio)
+- 의미 중요도가 추가되면 가중 정보 재현율
+- 종단 ASR + 위험 파이프라인 실패율
 
-Subgroup/sensitivity reporting:
-- hearing-level group
-- onset/nucleus/coda
-- SNR condition
-- speaker
-- WRS bands
+**추가(2026-08-16, `docs/RESULTS.md` §4의 발견에 따라):**
+- **청취자별 재현율 분포(최소·중앙값·최대)** — 총합 재현율은 소수 청취자에게 자막을
+  몰아주는 것으로 최대화될 수 있으므로 공동 1차 지표로 승격.
 
-## Simulation plan
-Simulation is for engineering/research power analysis and must be labeled synthetic.
+하위군/민감도 보고:
+- 청력 수준 군
+- 초성/중성/종성
+- SNR 조건
+- 화자
+- WRS 대역
 
-### Synthetic listener generator
-- choose hearing severity stratum
-- sample plausible audiogram shape
-- sample SRT/WRS conditional on severity using transparent priors or an auxiliary open audiology dataset
-- generate a confusion matrix by perturbing a literature-informed/group prior with Dirichlet noise
-- preserve Korean phonological constraints (e.g., stronger within-class confusions) only when supported by cited sources
+## 시뮬레이션 계획
+시뮬레이션은 공학·연구 검정력 분석을 위한 것이며 **합성으로 표시**되어야 합니다.
 
-### Synthetic trial generator
-1. choose target Korean word/sentence
-2. decompose Hangul into onset/nucleus/coda jamo
-3. draw perceived phonemes from `C_u`
-4. create observed mishearing label at word level
-5. optionally inject SNR/speaker effects through predeclared parameters
+### 합성 청취자 생성기
+- 청력 손실 중증도 계층 선택
+- 그럴듯한 순음청력도 형태 표집
+- 투명한 사전분포 또는 보조 공개 청각학 데이터셋을 이용해 중증도 조건부로 SRT/WRS 표집
+- 문헌/집단 사전분포를 디리클레 잡음으로 섭동해 혼동행렬 생성
+- 인용된 출처가 지지하는 경우에 한해 한국어 음운 제약(예: 부류 내 혼동 강화) 보존
 
-### Simulation sweeps
-- N listeners: 20, 40, 80, 160
-- calibration lengths: 10, 25, 50, 100, 200+ stimuli
-- caption budget: 10–50%
-- WRS strata
-- SNR levels
-- missing-clinical-variable scenarios
+### 합성 시행 생성기
+1. 목표 한국어 단어/문장 선택
+2. 한글을 초성/중성/종성 자모로 분해
+3. `C_u`에서 지각 음소 추출
+4. 단어 수준 오청 라벨 생성
+5. 선언된 파라미터로 SNR/화자 효과 선택적 주입
 
-Run >= 100 deterministic Monte Carlo seeds per configuration when computationally feasible. Publish confidence intervals, not only means.
+### 시뮬레이션 스윕
+- 청취자 수 N: 20, 40, 80, 160
+- 교정 길이: 10, 25, 50, 100, 200+ 자극
+- 자막 예산: 10–50 %
+- WRS 계층
+- SNR 수준
+- 임상 변수 결측 시나리오
 
-## Human/expert validation
-A 10-year hearing-aid professional with audiologist/hearing-specialist credentials may provide structured expert review.
+계산 가능하면 설정당 결정론적 몬테카를로 시드 100회 이상 실행.
+평균만이 아니라 **신뢰구간**을 공표할 것.
 
-Expert review validates:
-- clinical variable selection
-- calibration protocol feasibility
-- plausibility of confusion/risk explanations
-- UI safety and interpretation
+## 사람/전문가 검증
+청각사·청능사 자격을 갖춘 10년 경력 보청기 전문가가 구조화된 전문가 검토를 제공할 수
+있습니다.
 
-One expert is **not** a consensus panel. Treat the result as structured expert validation/qualitative evidence, not population-level clinical validation.
+전문가 검토가 검증하는 것:
+- 임상 변수 선택
+- 교정 프로토콜의 실행 가능성
+- 혼동/위험 설명의 타당성
+- UI 안전성과 해석
 
-If human listeners are recruited, obtain the required school/institutional ethics/consent approvals before data collection. Keep all participant-level data private.
+**전문가 1인은 합의 패널이 아닙니다.** 결과를 구조화된 전문가 검증/질적 근거로 다루되
+모집단 수준 임상 검증으로 다루지 마십시오.
 
-## Key falsification criteria
-AUDIRE should be considered unsupported if:
-- confusion features do not improve held-out prediction beyond clinical baselines;
-- selective captions fail to outperform random/non-personalized selection at matched caption budgets;
-- probabilities are badly miscalibrated and cannot be corrected;
-- improvements disappear under listener-level cross-validation.
+사람 청취자를 모집한다면 데이터 수집 **이전에** 필요한 학교/기관 연구윤리 승인과 동의를
+확보하십시오. 모든 참여자 단위 데이터는 비공개로 유지합니다.
 
-Negative results must remain in the final report.
+## 핵심 반증 기준
+다음의 경우 AUDIRE는 지지되지 않은 것으로 간주합니다:
+- 혼동 특징이 임상 베이스라인을 넘어 홀드아웃 예측을 개선하지 못함
+- 선택 자막이 동일 자막 예산에서 무작위/비개인화 선택을 이기지 못함
+- 확률이 심하게 잘못 보정되었고 교정할 수 없음
+- 청취자 수준 교차검증에서 개선이 사라짐
+
+**음성 결과는 최종 보고서에 반드시 남아야 합니다.**

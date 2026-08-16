@@ -1,64 +1,130 @@
-# AUDIRE Data Registry and Provenance
+# AUDIRE 데이터 레지스트리 및 출처 기록
 
-## 1. Primary Korean monosyllabic calibration data
-**Korean Monosyllabic Speech Perception Test Dataset** — 726 utterances, 2 speakers (363 each), 16 kHz, approximately 157 MB. Metadata includes syllable structure, duration, pitch, F1/F2/F3 and audio. License: **CC BY-NC-ND 4.0**. The dataset card says intended use/scope should be communicated to Woojae Han before use.
+> 이 문서는 서술이고, **기계 판독 가능한 정본은 `data/sources.yaml`**입니다.
+> 라이선스·리비전·기대 행수는 2026-08-16에 각 출처의 라이브 API에서 직접 확인했습니다.
+> 확인 과정에서 발견한 불일치 2건은 `docs/DECISIONS.md` ADR-0003에 기록되어 있습니다.
 
-Use in AUDIRE:
-- browser/desktop calibration stimuli
-- phoneme-position parsing tests
-- acoustic-feature sensitivity analyses
-- reproducible stimulus identifiers
+## 1. 1차 한국어 단음절 교정 데이터
 
-Do **not**:
-- commit audio to this public repository
-- publish modified audio or a derived audio corpus
-- imply that the public dataset includes the 72 participants' row-level perceptual responses
+**한국어 단음절 말지각검사 데이터셋** — 726개 발화, 화자 2명(각 363개), 16 kHz, 약 157 MB.
+메타데이터에 음절 구조·지속시간·피치·F1/F2/F3와 오디오가 포함됩니다.
+라이선스: **CC BY-NC-ND 4.0**. 데이터셋 카드는 사용 전에 사용 목적·범위를 Woojae Han에게
+알릴 것을 요청합니다.
 
-Source: https://huggingface.co/datasets/K-University-AIED/korean_monosyllabic_speech
+AUDIRE에서의 용도:
+- 브라우저/데스크톱 교정 자극
+- 음소 위치 파싱 테스트
+- 음향 특징 민감도 분석
+- 재현 가능한 자극 식별자
 
-## 2. Korean sentence-level audio for end-to-end evaluation
-**Zeroth-Korean**, OpenSLR SLR40 / Hugging Face mirror. Approximately 51.6 h training + 1.2 h test; 22,263 train utterances, 457 test utterances; CC BY 4.0.
+**금지:**
+- 이 공개 저장소에 음원 커밋
+- 변형 음원 또는 파생 음성 코퍼스 공표
+- 공개 데이터셋에 72명 참여자의 행 단위 지각 응답이 포함되어 있다는 암시
 
-Use in AUDIRE:
-- ASR regression testing
-- Korean word timestamping
-- sentence-level jamo decomposition
-- selective-caption output regression
-- noise/SNR simulation on a permissively licensed corpus
+출처: https://huggingface.co/datasets/K-University-AIED/korean_monosyllabic_speech
 
-Prefer the test split for CI-sized evaluation and a pinned sample manifest for deterministic tests.
+> **검증 시 발견(2026-08-16).** 카드 본문은 메타데이터 파일을 `updated_metadata.csv`로
+> 지칭하지만, 저장소의 실제 파일 목록에는 `metadata.csv`만 존재합니다(총 729개 항목:
+> `.gitattributes`, `README.md`, `metadata.csv`, `audio_files/*.wav` 726개).
+> `data/sources.yaml`이 실제 이름을 고정하고 코드는 레지스트리에서 읽습니다.
 
-Sources:
+## 2. 종단 평가용 한국어 문장 음성
+
+**Zeroth-Korean**, OpenSLR SLR40 / Hugging Face 미러.
+학습 약 51.6시간 + 테스트 1.2시간, 학습 22,263발화, 테스트 457발화, CC BY 4.0.
+
+AUDIRE에서의 용도:
+- ASR 회귀 테스트
+- 한국어 단어 타임스탬프
+- 문장 수준 자모 분해
+- 선택 자막 출력 회귀
+- 라이선스가 허용하는 잡음/SNR 시뮬레이션
+
+CI 규모 평가에는 테스트 분할과 고정된 샘플 매니페스트를 선호합니다.
+
+출처:
 - https://www.openslr.org/40/
 - https://huggingface.co/datasets/kresnik/zeroth_korean
 
-## 3. Auxiliary audiological dataset
-**A FAIR and Open-Access Database of Audiological Perceptual Measures**, Zenodo record 17091997. The record exposes General Information, source/Excel and SQL archives.
+> **검증 시 발견(2026-08-16).** 이 미러에는 기계 판독 가능한 `license` 프론트매터 필드가
+> **없습니다**(`cardData.license` 부재). CC BY 4.0은 카드 *본문*과 상위 OpenSLR SLR40
+> 레코드에 명시되어 있으며, 이것이 근거입니다. `data/sources.yaml`은 라이선스와 함께
+> **태그가 없다는 사실**을 기록해 감사 가능하게 합니다.
 
-Use in AUDIRE only for:
-- audiological schema design
-- sensitivity analyses across hearing/perceptual measures
-- checking plausible correlations among general audiological measures
+## 3. 보조 청각학 데이터셋
 
-Do not use its labels as Korean phoneme-confusion ground truth. Language/task mismatch must be explicit in every report.
+**A FAIR and Open-Access Database of Audiological Perceptual Measures**, Zenodo 레코드
+17091997. CC BY 4.0, 공개일 2025-09-09, 파일 3개.
 
-Source: https://zenodo.org/records/17091997
+AUDIRE에서 **오직** 다음 용도로만 사용:
+- 청각학 스키마 설계
+- 청각·지각 측정 간 민감도 분석
+- 일반 청각학 측정 간 그럴듯한 상관 확인
 
-## 4. 2026 Korean hearing-loss error studies
-Joo et al. (2026), DOI **10.21848/asr.250214**: 72 older adults assigned to normal, mild, moderate, severe hearing groups; 726 Korean monosyllabic stimuli at MCL. Total error rates rose with hearing loss severity; errors were classified at onset/nucleus/coda and by substitution/addition/omission/compound pattern.
+**그 라벨을 한국어 음소 혼동 정답으로 사용하지 마십시오.** 언어·과제 불일치를 모든
+보고서에서 명시해야 합니다. `Source.assert_permits()`가 이 금지를 강제하며 테스트가
+그 발동을 단언합니다.
 
-Ma et al. (2026), DOI **10.21848/asr.250216**: the same general experimental family analyzed confusion matrices and perceptual similarity/distance by hearing group. These publications are **reference/prior evidence**, not a license to invent or redistribute participant-level raw responses.
+출처: https://zenodo.org/records/17091997
 
-Published examples useful as sanity checks include stronger confusion within phonetic classes and hearing-level-dependent increases in similarity. Any numerical transcription from article tables must be stored with a `source_page/table` field and verified by a second pass.
+## 4. 2026년 한국어 난청 오류 연구
 
-## 5. KS-MWL-A / WRS reference
-The 2015 WRS test-retest paper describes the Korean Standard Monosyllabic Word Lists for Adults (KS-MWL-A), with 4 lists × 50 words, and SRT measured as the level for 50% correct response. It reports decreasing test-retest reliability as lists are shortened. Use this to constrain calibration-shortening experiments; do not assume that a custom 10-word calibration is clinically equivalent to a standardized WRS.
+**Joo et al. (2026)**, DOI **10.21848/asr.250214**,
+*Audiology and Speech Research* 22(1):21-33.
+노인 72명을 정상·경도·중등도·고도 난청 군으로 배정(20/20/20/12),
+726개 한국어 단음절 자극을 MCL에서 제시. 총 오류율이 난청 중증도에 따라 상승
+(**18.3 / 27.8 / 48.4 / 80.4 %**). 오류는 초성/중성/종성 위치와
+대치/첨가/탈락/복합 패턴으로 분류.
 
-Source: https://pmc.ncbi.nlm.nih.gov/articles/PMC4582455/
+**Ma et al. (2026)**, DOI **10.21848/asr.250216**,
+*Audiology and Speech Research* 22(1):34-41.
+같은 실험 계열에서 혼동행렬과 청력군별 지각 유사도/거리를 분석.
+초성 18·중성 16·종성 8 유형. 지각 거리가 정상→고도에서
+초성 5.43→3.05, 중성 5.51→3.53, 종성 5.78→3.66으로 감소.
 
-## Provenance rules
-1. Every downloaded source gets a machine-readable manifest: source URL/DOI, retrieval date, version/revision, license, file checksum.
-2. `data/raw/` and `data/processed/` are ignored by Git.
-3. Synthetic data must carry `is_synthetic=true` and can never be presented as clinical observations.
-4. Human participant data is private and de-identified; no audiograms, WRS, SRT, responses, names or identifiers in this public repo.
-5. A published aggregate may be manually transcribed only when its source table/figure is named and a verification checksum/test is added.
+이 출판물들은 **참조/사전 근거**이며, 참여자 단위 원시 응답을 지어내거나 재배포할 근거가
+아닙니다. 부류 내 혼동 강화, 청력 수준에 따른 유사도 증가 같은 출판된 사례는 타당성
+검사에 유용합니다. 논문 표에서 전사한 모든 수치는 `source_page/table` 필드와 함께 저장하고
+2차 검증을 거쳐야 합니다(위험 대장 L3).
+
+## 5. KS-MWL-A / WRS 참조
+
+**Kim et al. (2015)**, DOI **10.7874/jao.2015.19.2.68**,
+*Journal of Audiology & Otology* 19(2):68-73.
+한국표준 단음절어표(KS-MWL-A) 4개 목록 × 50단어를 기술하며, SRT를 50 % 정반응 강도로
+정의합니다. 목록이 짧아질수록 검사–재검사 신뢰도가 하락합니다:
+
+| 목록 길이 | 상관 | 95 % CI | 95 % PI |
+|---|---|---|---|
+| 50단어 | 0.88 | ±0.92 | ±15.84 |
+| 25단어 | 0.76 | ±1.38 | ±17.46 |
+| 10단어 | 0.61 | ±2.18 | ±26.22 |
+
+논문의 결론은 신뢰할 수 있는 WRS 측정에 **25단어 이상**을 권고한다는 것입니다.
+이를 교정 단축 실험의 제약으로 사용하십시오. **10단어 맞춤 교정이 표준화 WRS와
+임상적으로 동등하다고 가정하지 마십시오.**
+
+출처: https://pmc.ncbi.nlm.nih.gov/articles/PMC4582455/
+
+## 6. WHO 청력 손실 등급
+
+WHO, "Deafness and hearing loss" 팩트시트 및 *World report on hearing* (2021).
+더 좋은 귀 평균 dB HL 기준 등급: 정상 <20, 경도 20–34, 중등도 35–49,
+중등고도 50–64, 고도 65–79, 심도 80–94, 전농 ≥95.
+
+**중증도 계층은 표집과 하위군 보고를 위한 기술적 라벨이며, 진단·장애 정도 판정·개인에
+대한 임상 평가가 아닙니다.**
+
+출처: https://www.who.int/news-room/fact-sheets/detail/deafness-and-hearing-loss
+
+## 출처 기록 규칙
+
+1. 내려받은 모든 출처는 기계 판독 가능한 매니페스트를 갖습니다:
+   출처 URL/DOI, 취득일, 버전/리비전, 라이선스, 파일 체크섬.
+2. `data/raw/`와 `data/processed/`는 Git이 무시합니다.
+3. 합성 데이터는 반드시 `is_synthetic=true`를 지니며 임상 관측으로 제시될 수 없습니다.
+4. 사람 참여자 데이터는 비공개·비식별화되며, 이 공개 저장소에 청력도·WRS·SRT·응답·이름·
+   식별자가 들어가지 않습니다.
+5. 출판된 집계값은 출처 표/그림을 명시하고 검증 체크섬/테스트를 추가한 경우에만 수동
+   전사할 수 있습니다.

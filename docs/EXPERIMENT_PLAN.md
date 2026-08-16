@@ -1,71 +1,118 @@
-# Experiment and Simulation Plan
+# 실험 및 시뮬레이션 계획
 
-## E0 — data integrity
-Acceptance:
-- all datasets downloaded through registered sources
-- source/version/license/checksum manifest generated
-- expected primary row count = 726
-- Zeroth test rows = 457 when using the mirrored v2 layout
-- no raw data tracked by Git
+각 항목의 현재 실행 상태는 `docs/TASKS.md`, 기록된 결과는 `docs/RESULTS.md` 참조.
 
-## E1 — Hangul decomposition correctness
-Build exhaustive tests for modern Hangul syllable decomposition/recomposition. Validate onset/nucleus/coda indexing and no-coda handling. Property test: recomposition(decomposition(x)) == x for all supported Hangul syllables.
+## E0 — 데이터 무결성 ✅
+합격 조건:
+- 모든 데이터셋을 등록된 출처를 통해 내려받음
+- 출처/버전/라이선스/체크섬 매니페스트 생성
+- 1차 데이터 기대 행수 = 726
+- 미러 v2 레이아웃 사용 시 Zeroth 테스트 행수 = 457
+- Git이 추적하는 원시 데이터 없음
 
-## E2 — confusion matrix construction
-Input: target/perceived response pairs.
-Output:
-- onset matrix
-- nucleus matrix
-- coda matrix
-- smoothed row-normalized probabilities
-- sample-count matrix
+## E1 — 한글 분해 정확성 ✅
+현대 한글 음절 분해/조합에 대한 전수 테스트 구축.
+초성/중성/종성 인덱싱과 받침 없음 처리 검증.
+속성 테스트: 지원되는 모든 한글 음절에 대해 `recomposition(decomposition(x)) == x`.
 
-Tests:
-- rows sum to one after smoothing
-- absent categories handled explicitly
-- additions/omissions represented without silently dropping data
+**결과:** 11,172개 음절 전수 검증 통과. 열거에 의한 증명이며 표집이 아닙니다.
 
-## E3 — synthetic listener recovery
-Generate listeners with known parameters, fit the pipeline, and check whether estimated risks recover simulated truth within predeclared tolerance.
+## E2 — 혼동행렬 구성 ✅
+입력: 목표/지각 응답 쌍.
+출력:
+- 초성 행렬
+- 중성 행렬
+- 종성 행렬
+- 평활·행 정규화된 확률
+- 표본 크기 행렬
 
-## E4 — ablation study
-Listener-level split only. Compare:
-- PTA only
+테스트:
+- 평활 후 행 합이 1
+- 부재 범주를 명시적으로 처리
+- 첨가/탈락을 조용히 버리지 않고 표현
+
+## E3 — 합성 청취자 복원 ✅
+알려진 파라미터로 청취자를 생성하고 파이프라인을 적합해, 추정 위험이 사전 선언된 허용
+오차 내에서 시뮬레이션된 진값을 복원하는지 확인.
+
+**결과:** 교정 길이 25→100→400→1600에서 추정 오차가 단조 감소하며 1600에서 0.10 미만.
+
+## E4 — 절제 연구 ✅
+청취자 수준 분할만 사용. 비교 대상:
+- PTA만
 - PTA+SRT+WRS
-- confusion-only
-- PTA+SRT+WRS+confusion
+- 혼동만
+- PTA+SRT+WRS+혼동
+- (추가) 청취자 정보 없는 `word_context_only` 바닥 arm
 
-Never split repeated trials from the same listener across train and test in a way that leaks identity.
+같은 청취자의 반복 시행을 학습/평가에 걸쳐 분할해 정체성을 누출시키지 마십시오.
 
-## E5 — calibration-length study
-Compare 10/25/50/100/full calibration stimuli. Selection strategies:
-- random
-- phoneme-balanced
-- information-gain / uncertainty-based
+**결과:** `docs/RESULTS.md` §3. 결합 arm이 임상 arm 대비 ΔPR-AUC +0.006 [0.002, 0.010].
 
-Outcome: prediction degradation and confidence intervals.
+## E5 — 교정 길이 연구 ⬜ 미실행
+10/25/50/100/전체 교정 자극 비교. 선택 전략:
+- 무작위
+- 음소 균형
+- 정보 이득 / 불확실성 기반
 
-## E6 — selective-caption budget study
-For each model, rank words by predicted risk and evaluate 10/20/30/40/50% caption budgets. Produce Pareto plot and paired bootstrap confidence intervals.
+성과: 예측 저하와 신뢰구간.
 
-## E7 — ASR end-to-end regression
-Run pinned Zeroth-Korean test subset through ASR -> token/word alignment -> Hangul decomposition -> risk scoring -> caption renderer. Record ASR WER separately from hearing-risk errors.
+**상태:** 세 선택 전략 모두 구현되어 있고 테스트되어 있으나 스윕은 실행되지 않았습니다.
 
-## E8 — noise robustness
-Create reproducible noise mixtures only from sources whose licenses permit transformations. Test several SNR values. Never create or redistribute derivatives from the CC BY-NC-ND primary monosyllable dataset.
+## E6 — 선택 자막 예산 연구 ✅
+각 모델에 대해 예측 위험으로 단어 순위를 매기고 10/20/30/40/50 % 예산을 평가.
+파레토 그림과 쌍대 부트스트랩 신뢰구간 생성.
 
-## E9 — expert review
-Run the structured protocol in `EXPERT_PROTOCOL.md`; store de-identified ratings and qualitative notes outside the public repo, with only aggregate/report text committed.
+**계획 대비 변경(ADR-0011).** 예산을 **청취자별**로 적용하는 경우와 **통합**으로 적용하는
+경우를 모두 보고합니다. 전자가 실제 배포 방식이고, 후자는 청취자 수준 특징이 왜 전자에서
+무력한지를 보이는 메커니즘 대조입니다. 청취자별 재현율 분포를 함께 보고합니다.
 
-## E10 — final system acceptance
-A fresh machine must be able to:
-1. install dependencies from lockfiles;
-2. fetch permitted datasets using scripts;
-3. create/import a hearing profile;
-4. run calibration from local stimuli;
-5. upload Korean audio/video;
-6. transcribe and timestamp it;
-7. compute word-level risk;
-8. render selective captions;
-9. export SRT/ASS/JSON;
-10. reproduce the research report from fixed configs and seeds.
+## E7 — ASR 종단 회귀 🟡 부분
+고정된 Zeroth-Korean 테스트 부분집합을 ASR → 토큰/단어 정렬 → 한글 분해 → 위험 채점 →
+자막 렌더러로 통과시킴. ASR WER을 청취 위험 오류와 분리해 기록.
+
+**상태:** 파이프라인은 구현되고 리플레이 백엔드로 종단 테스트되었으나, 실제
+`faster-whisper` 가중치와 Zeroth 오디오로는 실행되지 않았습니다. WER 회귀 미실행.
+
+## E8 — 잡음 강건성 ⬜ 미실행
+라이선스가 변형을 허용하는 출처로만 재현 가능한 잡음 혼합 생성. 여러 SNR 값 테스트.
+**CC BY-NC-ND 1차 단음절 데이터셋으로는 파생물을 만들거나 재배포하지 마십시오.**
+
+**상태:** 시뮬레이터의 SNR 효과는 구현·테스트되었으나(낮은 SNR이 오청을 증가시킴을 검증),
+실제 오디오 잡음 혼합은 실행되지 않았습니다.
+
+## E9 — 전문가 검토 🚫 미시행
+`EXPERT_PROTOCOL.md`의 구조화된 프로토콜 실행. 비식별 평정과 질적 메모는 공개 저장소
+바깥에 보관하고, 집계/보고서 텍스트만 커밋.
+
+**상태:** 도구는 준비되었습니다. **검토는 시행되지 않았고 어떤 전문가 결과도 존재하지
+않습니다.** 시행 전 보고는 날조입니다.
+
+## E10 — 최종 시스템 인수 🟡 부분
+새 머신에서 다음이 가능해야 합니다:
+1. 락파일로 의존성 설치 ✅
+2. 스크립트로 허용된 데이터셋 취득 ✅
+3. 청력 프로파일 생성/가져오기 — 스키마·저장소 ✅ / UI ⬜
+4. 로컬 자극으로 교정 실행 — 자극 목록 ✅ / UI ⬜
+5. 한국어 오디오/비디오 업로드 ⬜
+6. 전사 및 타임스탬프 — 어댑터 ✅ / 실제 가중치 실행 ⬜
+7. 단어 수준 위험 계산 ✅
+8. 선택 자막 렌더링 ✅
+9. SRT/ASS/JSON 내보내기 ✅
+10. 고정 설정·시드로 연구 보고서 재현 🟡 (`sensitivity` 타깃 미구현)
+
+---
+
+## 추가된 실험 (결과에 따라)
+
+## E11 — 개인 특이성 × 교정 길이 스윕 ⬜ **최우선 미실행**
+RQ2의 음성 결과 — 청취자별 예산에서 혼동행렬이 단어길이 휴리스틱을 이기지 못함 — 가
+방법의 성질인지, 선택된 두 값(`dirichlet_concentration = 40`, 교정 100시행)의 성질인지
+결정합니다.
+
+설계: `dirichlet_concentration` ∈ {5, 10, 20, 40, 80, 160} ×
+교정 길이 ∈ {25, 50, 100, 200, 400}, 시드 5개.
+
+성과: 개인화 선택 자막이 비개인화 휴리스틱을 이기기 시작하는 영역의 경계.
+
+**남은 실험 중 정보량이 가장 큽니다.**

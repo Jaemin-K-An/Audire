@@ -1,224 +1,165 @@
-# AUDIRE Agent Harness
+# AUDIRE 에이전트 하니스
 
-This repository is an autonomous research-engineering project. The target is a **finished, reproducible, working system**, not an MVP, mockup, notebook-only demo, or slideware prototype.
+이 저장소는 자율 연구·공학 프로젝트입니다. 목표는 MVP·목업·노트북 데모·슬라이드웨어
+프로토타입이 아니라 **완성되고 재현 가능하며 동작하는 시스템**입니다.
 
-## 0. Mission
-Build and validate AUDIRE: a Korean selective-caption system that predicts word-level mishearing risk from a personalized speech-perception profile containing audiometric and speech-recognition measures plus an individual phoneme confusion matrix.
+> 영문 원본 계약서는 커밋 이력에 보존되어 있습니다. 본 문서는 그 한국어판이며 내용은
+> 동일합니다.
 
-The research question and system must remain coupled: every UI feature must map to a tested pipeline component; every claimed research result must be reproducible from code and versioned configuration.
+## 0. 임무
+AUDIRE 구축·검증: 청각 측정치와 어음인지 지표에 개인 음소 혼동행렬을 더한 개인화
+어음인지 프로파일로부터 단어 수준 오청 위험을 예측하는 한국어 선택 자막 시스템.
 
-## 1. Non-negotiable rules
-1. Never fabricate clinical data, participant responses, p-values, effect sizes, confusion matrices, or citations.
-2. Synthetic data must always carry explicit synthetic provenance.
-3. Never commit raw participant-level hearing data or identifiable information.
-4. Never commit third-party raw audio/model weights unless license and repository policy explicitly permit it. Prefer scripted acquisition.
-5. The primary 726-stimulus Korean dataset is CC BY-NC-ND 4.0; do not redistribute modified audio. Respect the dataset-card request to notify the creator before use.
-6. Do not treat the auxiliary non-Korean audiology dataset as Korean phoneme ground truth.
-7. Do not turn PTA/SRT/WRS into diagnosis. AUDIRE is research/accessibility software, not a medical device.
-8. No `TODO`, fake API, placeholder metrics, mocked inference, or manually hard-coded “successful” result may remain at final acceptance.
-9. Any external fact that affects design must have a source in `docs/` with URL/DOI and access date.
-10. If a proposed claim is not supported, weaken the claim; never weaken the evidence standard.
+연구 질문과 시스템은 결합되어야 합니다. **모든 UI 기능은 테스트된 파이프라인 구성요소에
+대응해야 하고, 모든 연구 결과 주장은 코드와 버전 관리된 설정으로 재현 가능해야 합니다.**
 
-## 2. Harness control loop
-For each work unit, execute this loop:
+## 1. 타협 불가 규칙
+1. 임상 데이터·참여자 응답·p값·효과크기·혼동행렬·인용을 **절대 날조하지 않는다.**
+2. 합성 데이터는 항상 명시적 합성 출처 표시를 지닌다.
+3. 참여자 단위 원시 청력 데이터나 식별 가능 정보를 절대 커밋하지 않는다.
+4. 라이선스와 저장소 정책이 명시적으로 허용하지 않는 한 제3자 원시 오디오/모델 가중치를
+   커밋하지 않는다. 스크립트 기반 취득을 선호한다.
+5. 1차 726자극 한국어 데이터셋은 CC BY-NC-ND 4.0이다. 변형 음원을 재배포하지 않는다.
+   사용 전 제작자 통보를 요청하는 데이터셋 카드의 요구를 존중한다.
+6. 보조 비한국어 청각학 데이터셋을 한국어 음소 정답으로 취급하지 않는다.
+7. PTA/SRT/WRS를 진단으로 바꾸지 않는다. **AUDIRE는 연구·접근성 소프트웨어이며
+   의료기기가 아니다.**
+8. 최종 인수 시점에 `TODO`, 가짜 API, 자리표시 지표, 목(mock) 추론, 수동으로 하드코딩한
+   "성공" 결과가 남아 있어서는 안 된다.
+9. 설계에 영향을 주는 모든 외부 사실은 URL/DOI와 접근일을 갖는 `docs/` 출처를 가져야 한다.
+10. 제안된 주장이 지지되지 않으면 **주장을 약화하라. 근거 기준을 약화하지 말라.**
 
-**OBSERVE -> SPECIFY -> TEST -> IMPLEMENT -> VERIFY -> RECORD -> NEXT**
+## 2. 하니스 제어 루프
+각 작업 단위마다 다음 루프를 실행합니다:
 
-### OBSERVE
-Read repository state, failing tests, experiment registry, current decisions and data provenance before editing.
+**관찰 → 명세 → 테스트 → 구현 → 검증 → 기록 → 다음**
 
-### SPECIFY
-Write the smallest explicit contract for the work unit: inputs, outputs, failure modes, acceptance test.
+### 관찰
+편집 전에 저장소 상태, 실패 테스트, 실험 레지스트리, 현재 결정, 데이터 출처를 읽습니다.
 
-### TEST
-Create or update tests before implementation when feasible. For research code, create an executable validation check or expected invariant.
+### 명세
+작업 단위의 최소 명시 계약을 작성합니다: 입력, 출력, 실패 모드, 인수 테스트.
 
-### IMPLEMENT
-Make the smallest coherent production-quality change. Avoid parallel alternate implementations unless an experiment explicitly compares them.
+### 테스트
+가능하면 구현 전에 테스트를 만들거나 갱신합니다. 연구 코드에는 실행 가능한 검증 검사나
+기대 불변식을 만듭니다.
 
-### VERIFY
-Run targeted tests, then the relevant integration suite. For model changes, rerun the pinned evaluation configuration.
+### 구현
+가장 작은 일관된 생산 품질 변경을 만듭니다. 실험이 명시적으로 비교하지 않는 한 병렬 대체
+구현을 만들지 않습니다.
 
-### RECORD
-Update `docs/DECISIONS.md`, experiment results, provenance and/or task ledger. Record negative outcomes.
+### 검증
+표적 테스트를 실행한 뒤 관련 통합 스위트를 실행합니다. 모델 변경 시 고정된 평가 설정을
+재실행합니다.
 
-### NEXT
-Choose the next highest-risk blocker, not the easiest cosmetic task.
+### 기록
+`docs/DECISIONS.md`, 실험 결과, 출처, 작업 대장을 갱신합니다. **음성 결과도 기록합니다.**
 
-## 3. Single source of truth
-Create and maintain:
-- `docs/SYSTEM_SPEC.md` — architecture/contracts
-- `docs/DECISIONS.md` — ADR-style decisions
-- `docs/TASKS.md` — granular work ledger with evidence links
-- `docs/RESULTS.md` — only reproduced metrics
-- `experiments/registry.yaml` — config, seed, git SHA, data manifest, metrics artifact
-- `data/manifests/` — source/version/license/checksum manifests
+### 다음
+가장 쉬운 표면적 작업이 아니라 **가장 위험도가 높은 미해결 차단 요인**을 선택합니다.
 
-Do not duplicate contradictory requirements across files. `AGENTS.md` is the top-level execution contract.
+## 3. 단일 진실 공급원
+생성·유지 대상:
+- `docs/SYSTEM_SPEC.md` — 아키텍처/계약
+- `docs/DECISIONS.md` — ADR 형식 결정
+- `docs/TASKS.md` — 근거 링크를 갖는 세분화된 작업 대장
+- `docs/RESULTS.md` — 재현된 지표만
+- `experiments/registry.yaml` — 설정, 시드, git SHA, 데이터 매니페스트, 지표 아티팩트
+- `data/manifests/` — 출처/버전/라이선스/체크섬 매니페스트
 
-## 4. Required system architecture
-Implement as typed Python packages plus a deployable local web application/API. A suggested structure:
+파일 간에 모순되는 요구사항을 중복시키지 마십시오. `AGENTS.md`가 최상위 실행 계약입니다.
 
-- `src/audire/hangul/` — jamo decomposition/recomposition
-- `src/audire/profile/` — audiogram/SRT/WRS/PBmax schema and validation
-- `src/audire/confusion/` — response parser, confusion matrices, smoothing
-- `src/audire/risk/` — baselines, learned probabilistic models, calibration
-- `src/audire/asr/` — ASR adapter with word timestamps
-- `src/audire/caption/` — word ranking, threshold/budget policy, SRT/ASS/JSON
-- `src/audire/sim/` — clearly synthetic listener/trial generator
-- `src/audire/eval/` — metrics, bootstrap CIs, ablations, plots
-- `apps/api/` — stable API
-- `apps/web/` — usable calibration/profile/audio/caption interface
-- `tests/` — unit, property, integration, E2E
+## 4. 요구 시스템 아키텍처
+타입이 붙은 Python 패키지와 배포 가능한 로컬 웹 애플리케이션/API로 구현합니다.
+제안 구조는 `README.md`의 저장소 구조를 참조하십시오.
 
-The exact frontend stack may be changed by ADR if a simpler robust option improves reproducibility.
+프론트엔드 스택은 더 단순하고 견고한 선택지가 재현성을 개선한다면 ADR로 변경할 수 있습니다.
 
-## 5. Core data contracts
-### HearingProfile
-Required fields must support missingness explicitly:
-- frequencies and left/right dB HL thresholds
-- PTA calculation method/version
-- SRT
-- WRS and presentation level
-- optional PBmax / PI function
-- optional MCL/UCL
-- hearing-aid state
-- provenance/source (`manual`, `clinical_export`, `synthetic`)
+## 5. 핵심 데이터 계약
+`docs/SYSTEM_SPEC.md` §3 참조. 요약:
+- **HearingProfile**: 결측을 명시적으로 지원해야 하며, 파생값은 계산 방법을 명시합니다.
+- **ConfusionProfile**: 초성/중성/종성별로 빈도와 확률을 분리 저장합니다.
+  탈락/받침없음/첨가 상태를 필요한 곳에 포함합니다.
+  **표본 크기를 보존하지 않은 채 확률로부터 신뢰도를 추론하지 마십시오.**
+- **WordRisk**: 텍스트/토큰, 시작·종료 타임스탬프, 예측 확률, 모델 버전, 기여 특징/위험
+  설명, 자막 결정 + 임계값/예산 정책, 그리고 **가능한 경우 청취자 위험과 별개의 ASR
+  신뢰도**를 포함해야 합니다.
 
-### ConfusionProfile
-Store counts and probabilities separately for onset/nucleus/coda. Include deletion/no-coda/addition states where needed. Never infer confidence from a probability without retaining sample count.
+## 6. 모델 개발 계약
+해석 가능한 베이스라인에서 시작합니다. 모델을 비교하십시오. **복잡성이 이긴다고 가정하지
+마십시오.**
 
-### WordRisk
-Must contain:
-- text/token
-- start/end timestamp
-- predicted probability
-- model version
-- contributing feature/risk explanation
-- caption decision + threshold/budget policy
-- ASR confidence separately from listener risk when available
+최소 요구 비교: 순음청력도/PTA만, PTA+SRT+WRS, 혼동만, PTA+SRT+WRS+혼동,
+결정론적 음소 독립 베이스라인.
 
-## 6. Model development contract
-Start with interpretable baselines. Compare models; do not assume complexity wins.
+1차 분할은 **청취자 수준**입니다. 청취자를 학습·평가 양쪽에 넣는 무작위 시행 수준 분할을
+쓰지 마십시오.
 
-Required minimum comparisons:
-- audiogram/PTA only
-- PTA + SRT + WRS
-- confusion-only
-- PTA + SRT + WRS + confusion
-- deterministic phoneme independence baseline
+**확률의 품질이 중요합니다.** 변별 지표와 함께 Brier 점수·로그 손실·보정을 보고하십시오.
 
-Primary split is **listener-level**, never random trial-level when that leaks a listener into both train and test.
+## 7. 연구 시뮬레이션 계약
+합성 시뮬레이션은 **검사 도구이지 실제 임상 효능의 근거가 아닙니다.**
 
-Probability quality matters. Report Brier score, log loss and calibration along with discrimination metrics.
+모든 난수 생성기는 명시적 시드를 씁니다. 모든 실험은 설정 기반입니다.
+다음을 기록하지 않은 실행은 무효입니다: git SHA, 데이터 매니페스트 ID,
+환경/의존성 락 해시, 난수 시드, 정확한 설정, stdout/로그 아티팩트, 지표 아티팩트.
 
-## 7. Research simulation contract
-Synthetic simulation must be a test instrument, not evidence of real clinical efficacy.
+## 8. 데이터 취득 계약
+`scripts/fetch_data.py`와 매니페스트/체크섬 검증을 구현합니다.
+다운로드는 멱등적이고 재개 가능해야 합니다.
 
-All random generators use explicit seeds. Every experiment is config-driven. A run is invalid unless it records:
-- git SHA
-- data manifest IDs
-- environment/dependency lock hash
-- random seed(s)
-- exact config
-- stdout/log artifact
-- metrics artifact
+CC BY-NC-ND 1차 데이터셋에 대해서는, 연구 사용 통보 요구가 처리되었다는 **명시적 로컬
+승인**(환경 변수 또는 CLI 플래그)을 요구합니다. **절대 자동으로 이메일을 보내지 마십시오.**
 
-## 8. Data acquisition contract
-Implement `scripts/fetch_data.py` plus manifest/checksum validation. Downloads must be idempotent and restartable.
+## 9. ASR 계약
+단어 타임스탬프를 제공하는, 유지보수되는 한국어 지원 ASR 백엔드를 사용합니다.
+기본값은 `faster-whisper`일 수 있으나 고정 전에 현행 라이브러리/모델 지원을 확인하십시오.
+어댑터는 모델 교체를 허용해야 합니다.
 
-For the CC BY-NC-ND primary dataset, require an explicit local acknowledgment (environment variable or CLI flag) that the research-use notification requirement has been handled. Never auto-send email.
+분리할 것: ASR 전사 오류 / 청취자 오청 위험.
+**나쁜 ASR 가설이 조용히 참된 청취자별 위험 신호로 취급되어서는 안 됩니다.**
 
-## 9. ASR contract
-Use a maintained Korean-capable ASR backend with word timestamps. Default may be `faster-whisper`, but verify current library/model support before pinning. The adapter must allow model substitution.
+## 10. 자막 정책 계약
+확률 임계값 정책과 고정 자막 예산 정책을 모두 지원합니다.
+출력: HTML/웹 렌더링, SRT, ASS(시각 강조용), 전체 위험 메타데이터를 갖는 JSON.
+전체 자막은 비교/접근성 모드로 계속 제공됩니다.
 
-Separate:
-- ASR transcription error
-- listener mishearing risk
+## 11. 테스트 계약
+최종 인수 전 필수: 한글 음절 왕복 속성 테스트(전수), 행렬 정규화/빈도 불변식,
+결측 데이터 검증 테스트, 합성 파라미터 복원 테스트, 모델 누출 테스트,
+결정론적 실험 테스트, 데이터 매니페스트/체크섬 테스트, API 계약 테스트,
+브라우저 E2E 정상 경로 및 실패 경로, SRT/ASS 내보내기 스냅샷 테스트,
+CPU 전용 종단 스모크 테스트.
 
-A bad ASR hypothesis must never be silently treated as a true listener-specific risk signal.
+목표: 핵심 모듈 분기 커버리지 90 % 이상. **커버리지를 부풀리기 위한 사소한 테스트를
+작성하지 마십시오.**
 
-## 10. Caption policy contract
-Support both:
-- probability threshold policy
-- fixed caption-budget policy
+## 12. CI / 품질 게이트
+CI는 포맷팅/린팅, 타입 검사, 테스트, 보안/의존성 검사, 작은 결정론적 E2E 픽스처를
+실행해야 합니다. 락파일로 의존성을 고정합니다.
 
-Outputs:
-- HTML/web rendering
-- SRT
-- ASS (for visual emphasis)
-- JSON with full risk metadata
+다음의 경우 병합/릴리스 금지: 테스트 스위트 실패, 데이터 출처 누락, 실험 결과 재현 불가,
+임상 주장에 근거 부재, 라이선스 요구사항 미해결.
 
-Full captions remain available as a comparison/accessibility mode.
+## 13. 마일스톤 게이트
+G0 근거·법적/데이터 · G1 지각 핵심 · G2 프로파일·시뮬레이션 · G3 위험 모델링 ·
+G4 자막 엔진 · G5 종단 ASR · G6 완성된 사용자 시스템 · G7 검증 · G8 재현 가능한 최종 릴리스.
 
-## 11. Testing contract
-Required before final acceptance:
-- exhaustive Hangul syllable round-trip property tests
-- matrix normalization/count invariants
-- missing-data validation tests
-- synthetic parameter-recovery tests
-- model leakage tests
-- deterministic experiment tests
-- data manifest/checksum tests
-- API contract tests
-- browser E2E happy path and failure paths
-- SRT/ASS export snapshot tests
-- CPU-only end-to-end smoke test
+**이전 게이트를 "완성된 제품"으로 부르지 마십시오.** 현재 상태는 `docs/TASKS.md` 참조.
 
-Target: critical core modules >=90% branch coverage; do not game coverage with trivial tests.
+## 14. 완료의 정의
+새 평가자가 저장소를 클론하고 문서화된 명령만으로 다음을 할 수 있을 때에만 완료입니다:
+1. 고정된 의존성 설치
+2. 허용된 데이터 내려받기/검증
+3. 모든 테스트 실행
+4. 합성 프로파일 생성 및 벤치마크 결과 재현
+5. 커밋 없이 실제 프로파일 입력/가져오기
+6. 한국어 단음절 교정 수행
+7. 한국어 오디오/비디오 파일 처리
+8. 선택 자막과 단어별 위험 설명 확인
+9. SRT/ASS/JSON 내보내기
+10. 실험 설정으로부터 최종 표/그림/보고서 재생성
+11. 각 결과를 어떤 데이터/모델/버전이 만들었는지 출처 확인
 
-## 12. CI / quality gates
-CI must run formatting/linting, type checking, tests, security/dependency checks and a small deterministic E2E fixture. Pin dependencies with lockfiles.
-
-No merge/release if:
-- test suite fails
-- data provenance is missing
-- an experiment result cannot be reproduced
-- a clinical claim lacks evidence
-- a license requirement is unresolved
-
-## 13. Milestone gates
-### G0 — evidence and legal/data gate
-Research plan, source registry, licenses, dataset fetchers, claims matrix.
-
-### G1 — perceptual core
-Hangul parser + response parser + confusion matrix engine + tests.
-
-### G2 — profile and simulation
-Validated HearingProfile + synthetic listener/trial engine + parameter-recovery tests.
-
-### G3 — risk modeling
-Baselines + learned model + calibration + listener-level evaluation + ablations.
-
-### G4 — caption engine
-Risk-to-caption policy + exports + evaluation by caption budget.
-
-### G5 — end-to-end ASR
-Korean audio -> transcript/timestamps -> risk -> selective caption, with ASR error tracked separately.
-
-### G6 — complete user system
-Profile import/editor, calibration workflow, upload/process/result UI, explanation and exports.
-
-### G7 — validation
-Noise/speaker sensitivity, expert consultation, failure analysis, ethics/limitations.
-
-### G8 — reproducible final release
-Fresh-machine install, one-command data preparation, one-command tests, one-command research reproduction, packaged release, final technical/research report.
-
-Do not label any earlier gate as “finished product”.
-
-## 14. Definition of done
-The project is done only when a new evaluator can clone the repository and, using documented commands:
-1. install pinned dependencies;
-2. download/verify permitted data;
-3. run all tests;
-4. generate a synthetic profile and reproduce benchmark results;
-5. enter/import a real profile without committing it;
-6. perform a Korean monosyllable calibration;
-7. process a Korean audio/video file;
-8. view selective captions and per-word risk explanations;
-9. export SRT/ASS/JSON;
-10. regenerate the final tables/figures/report from experiment configs;
-11. inspect provenance showing exactly which data/model/version produced each result.
-
-If any step requires hand-editing source code, hidden local files, fabricated outputs, or an undocumented manual patch, the system is not done.
+어느 단계든 소스 수기 편집, 숨겨진 로컬 파일, 날조된 출력, 문서화되지 않은 수동 패치를
+요구한다면 **시스템은 완료되지 않은 것입니다.**
