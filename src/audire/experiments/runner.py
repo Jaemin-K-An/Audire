@@ -21,7 +21,7 @@ from audire.config.logging import get_logger
 from audire.eval.ablation import DEFAULT_CONTRASTS, ArmResult, evaluate_arm
 from audire.eval.ablation import contrast as paired_contrast
 from audire.eval.caption import compare_strategies, compare_thresholds, pareto_table
-from audire.experiments.registry import RunRecord, finish_run, new_run, save_artifact
+from audire.experiments.registry import RunRecord, finish_run, save_artifact, tracked_run
 from audire.risk.calibration import CalibrationMethod
 from audire.risk.features import ABLATION_ARMS
 from audire.sim.cohort import build_cohort
@@ -88,10 +88,21 @@ def _aggregate(values: list[float]) -> dict[str, float]:
 
 
 def run_experiment(cfg: ExperimentConfig, *, record: RunRecord | None = None) -> dict[str, Any]:
-    """Execute every seed of ``cfg`` and return the aggregated summary."""
-    rec = record or new_run(
+    """Execute every seed of ``cfg`` and return the aggregated summary.
+
+    The whole execution runs inside :func:`~audire.experiments.registry.tracked_run`, so
+    the registry shows the run as ``running`` while it executes and as ``failed`` — with
+    its config and traceback intact — if it raises. A failed run must never vanish.
+    """
+    if record is not None:
+        return _execute(cfg, record)
+    with tracked_run(
         cfg.name, cfg.model_dump(mode="json"), cfg.simulation.seeds, notes=cfg.description
-    )
+    ) as rec:
+        return _execute(cfg, rec)
+
+
+def _execute(cfg: ExperimentConfig, rec: RunRecord) -> dict[str, Any]:
     log.info("experiment.start", name=cfg.name, seeds=cfg.simulation.seeds, run_id=rec.run_id)
 
     per_seed: list[SeedResult] = []

@@ -27,7 +27,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from audire.config.logging import get_logger
 from audire.eval.ablation import evaluate_arm
 from audire.eval.caption import compare_strategies
-from audire.experiments.registry import RunRecord, finish_run, new_run, save_artifact
+from audire.experiments.registry import RunRecord, finish_run, save_artifact, tracked_run
 from audire.sim.cohort import build_cohort
 from audire.sim.config import SimulationConfig
 
@@ -66,13 +66,23 @@ class SensitivityConfig(BaseModel):
 
 
 def run_sensitivity(cfg: SensitivityConfig, *, record: RunRecord | None = None) -> dict[str, Any]:
-    """격자의 모든 칸을 모든 시드로 실행합니다. 어떤 칸도 건너뛰지 않습니다."""
-    rec = record or new_run(
+    """격자의 모든 칸을 모든 시드로 실행합니다. 어떤 칸도 건너뛰지 않습니다.
+
+    전체 실행이 :func:`~audire.experiments.registry.tracked_run` 안에서 돌기 때문에,
+    도중에 예외가 나도 레지스트리에 설정과 트레이스백을 갖춘 ``failed`` 항목이 남습니다.
+    """
+    if record is not None:
+        return _execute(cfg, record)
+    with tracked_run(
         cfg.name,
         cfg.model_dump(mode="json"),
         cfg.base_simulation.seeds,
         notes=cfg.description,
-    )
+    ) as rec:
+        return _execute(cfg, rec)
+
+
+def _execute(cfg: SensitivityConfig, rec: RunRecord) -> dict[str, Any]:
     log.info("sensitivity.start", name=cfg.name, n_cells=cfg.n_cells, run_id=rec.run_id)
 
     rows: list[dict[str, Any]] = []

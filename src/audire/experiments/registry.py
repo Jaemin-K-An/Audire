@@ -13,6 +13,9 @@ import json
 import platform
 import subprocess
 import sys
+import traceback
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -97,6 +100,9 @@ class RunRecord:
     status: str = "running"
     finished_at_utc: str | None = None
     error: str | None = None
+    #: Traceback of the failure. An error string alone does not say where it happened,
+    #: which is exactly what someone re-running a failed experiment needs to know.
+    error_traceback: str | None = None
     notes: str = ""
 
     def to_dict(self) -> dict[str, Any]:
@@ -193,9 +199,50 @@ def finish_run(record: RunRecord, metrics: dict[str, Any], status: str = "comple
     return append_run(record)
 
 
-def fail_run(record: RunRecord, error: str) -> Path:
+def fail_run(record: RunRecord, error: str, traceback_text: str | None = None) -> Path:
     """Record a failed run rather than leaving a silent gap in the registry."""
     record.status = "failed"
     record.error = error
+    record.error_traceback = traceback_text
     record.finished_at_utc = datetime.now(UTC).isoformat()
     return append_run(record)
+
+
+@contextmanager
+def tracked_run(
+    experiment: str,
+    config: dict[str, Any],
+    seeds: list[int],
+    notes: str = "",
+) -> Iterator[RunRecord]:
+    """Run an experiment under a lifecycle that the registry always observes.
+
+    The registry entry is written **on entry**, with ``status="running"``, so an
+    experiment that is still executing — or that was killed without unwinding — is
+    visible rather than invisible.
+
+    Previously the two main runners called ``new_run()`` and then ``finish_run()`` with
+    no exception handling. ``new_run()`` only *constructs* a record; nothing reached the
+    registry until ``finish_run``. A run that raised part-way through therefore left **no
+    trace at all**, which is worse than being recorded as failed: a reader could not tell
+    the run had ever been attempted.
+
+    On any exception — including :class:`BaseException` such as ``KeyboardInterrupt``,
+    because a long sweep is routinely interrupted — the record is marked ``failed`` with
+    the error and its traceback, and the exception is re-raised unchanged.
+    """
+    record = new_run(experiment, config, seeds, notes=notes)
+    append_run(record)  # visible as `running` from this moment on
+    try:
+        yield record
+    except BaseException as exc:
+        fail_run(
+            record,
+            f"{type(exc).__name__}: {exc}",
+            traceback_text="".join(traceback.format_exception(type(exc), exc, exc.__traceback__)),
+        )
+        raise
+    else:
+        # A runner that already called finish_run keeps its own metrics and status.
+        if record.status == "running":
+            finish_run(record, record.metrics)

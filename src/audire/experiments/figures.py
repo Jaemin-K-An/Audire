@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib
+import numpy as np
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -50,11 +51,15 @@ def regenerate(*, run_id: str | None = None, all_runs: bool = False) -> list[Pat
             continue
         out = artifacts_dir() / rid / "figures"
         out.mkdir(parents=True, exist_ok=True)
-        written += _ablation_table(summary, out)
-        written += _contrast_table(summary, out)
-        written += _caption_frontier_figure(summary, out)
-        written += _calibration_table(summary, out)
-        written += _threshold_table(summary, out)
+        if "grid" in summary:
+            written += _sensitivity_table(summary, out)
+            written += _sensitivity_figure(summary, out)
+        elif "arms" in summary:
+            written += _ablation_table(summary, out)
+            written += _contrast_table(summary, out)
+            written += _caption_frontier_figure(summary, out)
+            written += _calibration_table(summary, out)
+            written += _threshold_table(summary, out)
     return written
 
 
@@ -145,6 +150,24 @@ def _threshold_table(summary: dict[str, Any], out: Path) -> list[Path]:
     return _write_csv(out / "table_threshold_comparison.csv", rows)
 
 
+def _sensitivity_table(summary: dict[str, Any], out: Path) -> list[Path]:
+    rows = [
+        {
+            "dirichlet_concentration": r["dirichlet_concentration"],
+            "n_calibration_trials": r["n_calibration_trials"],
+            "arm": r["arm"],
+            "n_seeds": r["n_seeds"],
+            "pr_auc_mean": round(r["pr_auc_mean"], 4),
+            "misheard_recall_mean": round(r["misheard_recall_mean"], 4),
+            "worst_listener_recall_mean": round(r["worst_listener_recall_mean"], 4),
+            "recall_over_word_length_mean": round(r["recall_over_word_length_mean"], 4),
+            "n_seeds_beating_word_length": r["n_seeds_beating_word_length"],
+        }
+        for r in summary["grid"]
+    ]
+    return _write_csv(out / "table_sensitivity.csv", rows)
+
+
 # --------------------------------------------------------------------------- figures
 
 
@@ -191,3 +214,98 @@ def _caption_frontier_figure(summary: dict[str, Any], out: Path) -> list[Path]:
         plt.close(fig)
         written.append(path)
     return written
+
+
+def _sensitivity_figure(summary: dict[str, Any], out: Path) -> list[Path]:
+    """Render the primary personalized arm over both preregistered sweep axes."""
+    arm = "clinical_plus_confusion"
+    rows = [r for r in summary["grid"] if r["arm"] == arm]
+    if not rows:
+        return []
+
+    concentrations = sorted({float(r["dirichlet_concentration"]) for r in rows})
+    calibrations = sorted({int(r["n_calibration_trials"]) for r in rows})
+    row_index = {value: index for index, value in enumerate(concentrations)}
+    column_index = {value: index for index, value in enumerate(calibrations)}
+    shape = (len(concentrations), len(calibrations))
+    gains = np.full(shape, np.nan)
+    wins = np.full(shape, np.nan)
+    seed_counts = np.full(shape, np.nan)
+    for row in rows:
+        index = (
+            row_index[float(row["dirichlet_concentration"])],
+            column_index[int(row["n_calibration_trials"])],
+        )
+        gains[index] = float(row["recall_over_word_length_mean"])
+        wins[index] = float(row["n_seeds_beating_word_length"])
+        seed_counts[index] = float(row["n_seeds"])
+
+    gain_limit = max(
+        (abs(float(value)) for value in gains.flat if np.isfinite(value)), default=0.001
+    )
+    gain_limit = max(gain_limit, 0.001)
+    max_seeds = max((float(value) for value in seed_counts.flat if np.isfinite(value)), default=1.0)
+
+    fig, (ax_gain, ax_wins) = plt.subplots(1, 2, figsize=(12, 5.2))
+    fig.subplots_adjust(left=0.08, right=0.94, bottom=0.15, top=0.80, wspace=0.38)
+    gain_image = ax_gain.imshow(
+        gains,
+        cmap="coolwarm",
+        vmin=-gain_limit,
+        vmax=gain_limit,
+        aspect="auto",
+        origin="lower",
+    )
+    win_image = ax_wins.imshow(
+        wins,
+        cmap="viridis",
+        vmin=0,
+        vmax=max_seeds,
+        aspect="auto",
+        origin="lower",
+    )
+
+    for ax in (ax_gain, ax_wins):
+        ax.set_xticks(range(len(calibrations)), labels=calibrations)
+        ax.set_yticks(range(len(concentrations)), labels=[f"{value:g}" for value in concentrations])
+        ax.set_xlabel("calibration trials")
+        ax.set_ylabel("Dirichlet concentration (lower = more idiosyncratic)")
+    ax_gain.set_title("Recall gain over word-length heuristic")
+    ax_wins.set_title("Seeds beating word-length heuristic")
+
+    for row_number, column_number in np.ndindex(shape):
+        if np.isfinite(gains[row_number, column_number]):
+            ax_gain.text(
+                column_number,
+                row_number,
+                f"{gains[row_number, column_number]:+.3f}",
+                ha="center",
+                va="center",
+                fontsize=9,
+            )
+        if np.isfinite(wins[row_number, column_number]):
+            wins_label = (
+                f"{int(wins[row_number, column_number])}/"
+                f"{int(seed_counts[row_number, column_number])}"
+            )
+            ax_wins.text(
+                column_number,
+                row_number,
+                wins_label,
+                ha="center",
+                va="center",
+                fontsize=9,
+                color="white" if wins[row_number, column_number] > max_seeds / 2 else "black",
+            )
+
+    fig.colorbar(gain_image, ax=ax_gain, label="misheard-word recall difference")
+    fig.colorbar(win_image, ax=ax_wins, label="number of seeds")
+    fig.suptitle(
+        f"{summary['experiment']}\nSynthetic sensitivity analysis — not clinical evidence",
+        y=0.97,
+        fontsize=10,
+    )
+    path = out / f"fig_sensitivity_{arm}.png"
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+    return [path]
