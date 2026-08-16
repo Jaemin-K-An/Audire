@@ -1,0 +1,26 @@
+# Fast deterministic configuration for CI and for `make smoke`.
+# Small enough to finish in seconds; exercises the same code path as rq1_main.
+
+name: smoke
+description: Deterministic minimal run used by CI to prove the research path executes.
+
+simulation:
+  name: smoke_cohort
+  seeds: [7]
+  n_listeners: 20
+  n_calibration_trials: 40
+  n_word_trials: 40
+  snr_conditions_db: [20.0]
+  speakers: [male, female]
+
+arms: [word_context_only, clinical, clinical_plus_confusion]
+models: [logistic]
+n_splits: 4
+calibration: none
+n_bootstrap: 20
+ece_bins: 10
+caption_budgets: [0.20]
+threshold_targets: [0.20]
+contrasts:
+  - [clinical_plus_confusion, clinical]
+contrast_metrics: [pr_auc]

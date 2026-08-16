@@ -1,0 +1,55 @@
+# AUDIRE preregistered main experiment (RQ1 / RQ2 / RQ3).
+#
+# Everything that could be chosen after seeing a result is fixed here: the arms, the
+# model families, the seed list, the fold count, the ECE bin count, the bootstrap size,
+# the caption budgets and the contrasts.
+#
+# The simulation block is SYNTHETIC. Results answer "can the estimator recover the
+# structure the generator put there, and how sensitive is the design?" — not "do human
+# listeners behave this way".
+
+name: rq1_main
+description: >-
+  Listener-level ablation of clinical vs individual-confusion features for word-level
+  Korean mishearing prediction, with the matched-budget caption study and the
+  personalized-versus-global threshold comparison.
+
+simulation:
+  name: rq1_main_cohort
+  # All five seeds are executed and reported with their spread. Reporting one favourable
+  # seed is a protocol violation (docs/RISK_REGISTER.md X2).
+  seeds: [101, 202, 303, 404, 505]
+  n_listeners: 80
+  n_calibration_trials: 100
+  n_word_trials: 250
+  snr_conditions_db: [20.0]
+  speakers: [male, female]
+
+arms:
+  - word_context_only        # non-personalized floor
+  - pta_only                 # B3
+  - clinical                 # B4 (PTA + SRT + WRS)
+  - confusion_only           # confusion profile alone
+  - clinical_plus_confusion  # AUDIRE
+
+models:
+  - logistic                 # primary interpretable family
+  - phoneme_independence     # deterministic R_phon comparator
+  - gradient_boosting        # single justified nonlinear comparator
+
+n_splits: 5
+calibration: none
+n_bootstrap: 1000
+ece_bins: 10
+decision_threshold: 0.5
+
+caption_budgets: [0.10, 0.20, 0.30, 0.40, 0.50]
+threshold_targets: [0.10, 0.20, 0.30]
+
+contrasts:
+  - [clinical_plus_confusion, clinical]          # RQ1 primary
+  - [clinical_plus_confusion, pta_only]
+  - [confusion_only, clinical]
+  - [clinical_plus_confusion, word_context_only]
+
+contrast_metrics: [pr_auc, brier]
