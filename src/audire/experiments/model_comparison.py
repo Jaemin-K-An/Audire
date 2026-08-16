@@ -276,9 +276,12 @@ def _summarise(cfg: ModelComparisonConfig, rows: list[dict[str, Any]]) -> dict[s
             "n_seeds_beating_word_length": int(sum(1 for g in gains if g > 0)),
             # 교정이 실제로 돌았는가.
             "n_folds_fell_back": sum(r["n_folds_fell_back"] for r in group),
+            # 교정을 요청하지 않은 행에는 폴드별 기록이 없습니다. 빈칸으로 두면 "기록이
+            # 없다" 와 "교정이 없었다" 가 구분되지 않으므로 요청값을 명시합니다.
             "effective_methods": sorted(
                 {e["effective_method"] for r in group for e in r["calibration_per_fold"]}
-            ),
+            )
+            or [calibration],
             "fallback_reasons": sorted(
                 {
                     e["fallback_reason"]

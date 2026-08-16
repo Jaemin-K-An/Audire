@@ -261,3 +261,11 @@ def test_run_is_recorded_in_the_registry(result):
 
     ids = {r["run_id"] for r in load_runs()}
     assert result["run_id"] in ids
+
+
+def test_uncalibrated_rows_state_their_effective_method_explicitly(result):
+    """빈칸은 "기록이 없다" 와 "교정이 없었다" 를 구분하지 못합니다."""
+    for row in result["summary"]["table"]:
+        assert row["effective_methods"], row["model"]
+        if row["calibration_requested"] == "none":
+            assert row["effective_methods"] == ["none"]

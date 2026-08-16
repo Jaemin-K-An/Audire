@@ -54,6 +54,8 @@ def regenerate(*, run_id: str | None = None, all_runs: bool = False) -> list[Pat
         if "grid" in summary:
             written += _sensitivity_table(summary, out)
             written += _sensitivity_figure(summary, out)
+        elif "table" in summary:
+            written += _model_comparison_table(summary, out)
         elif "arms" in summary:
             written += _ablation_table(summary, out)
             written += _contrast_table(summary, out)
@@ -134,6 +136,43 @@ def _calibration_table(summary: dict[str, Any], out: Path) -> list[Path]:
         for r in summary["arms"]
     ]
     return _write_csv(out / "table_calibration.csv", rows)
+
+
+def _model_comparison_table(summary: dict[str, Any], out: Path) -> list[Path]:
+    """E22 표.
+
+    지는 후보를 걸러내지 않습니다. 정렬만 이득 순으로 하고 행은 전부 남기므로, 표를
+    읽는 사람이 "무엇이 실패했는가" 를 사후 편집 없이 볼 수 있습니다. 교정 폴백 횟수와
+    ``output_is_probability`` 를 함께 실어, 확률 지표를 읽어도 되는 행인지 판단할 수
+    있게 합니다.
+    """
+    budget_keys = sorted(
+        {k for r in summary["table"] for k in r if k.startswith("recall_at_")},
+        key=lambda k: float(k.removeprefix("recall_at_")),
+    )
+    rows = [
+        {
+            "model": r["model"],
+            "arm": r["arm"],
+            "calibration_requested": r["calibration_requested"],
+            "effective_methods": "|".join(r["effective_methods"]),
+            "n_folds_fell_back": r["n_folds_fell_back"],
+            "output_is_probability": r["output_is_probability"],
+            "n_seeds": r["n_seeds"],
+            "pr_auc_mean": round(r["pr_auc"]["mean"], 4),
+            "pr_auc_sd": round(r["pr_auc"]["sd"], 4),
+            "brier_mean": round(r["brier"]["mean"], 4),
+            "ece_mean": round(r["ece"]["mean"], 4),
+            **{k: round(r[k]["mean"], 4) for k in budget_keys},
+            "recall_median_listener": round(r["recall_median_listener"]["mean"], 4),
+            "recall_worst_listener": round(r["recall_worst_listener"]["mean"], 4),
+            "gain_over_word_length_mean": round(r["gain_over_word_length"]["mean"], 5),
+            "gain_over_word_length_sd": round(r["gain_over_word_length"]["sd"], 5),
+            "n_seeds_beating_word_length": r["n_seeds_beating_word_length"],
+        }
+        for r in sorted(summary["table"], key=lambda r: -r["gain_over_word_length"]["mean"])
+    ]
+    return _write_csv(out / "table_model_comparison.csv", rows)
 
 
 def _threshold_table(summary: dict[str, Any], out: Path) -> list[Path]:
