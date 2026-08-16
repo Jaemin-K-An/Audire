@@ -1,0 +1,170 @@
+# AUDIRE external source registry.
+#
+# Every entry records what a source may and may not be used for. `scripts/fetch_data.py`
+# reads this file; nothing may be downloaded that is not registered here.
+#
+# `verified_at` is the UTC date on which the listed `license` / `revision` /
+# `expected_*` values were checked against the live source API by a human or agent.
+# Re-verify before pinning a new revision.
+
+schema_version: 1
+
+sources:
+  - id: korean_monosyllabic_speech
+    role: primary_calibration_stimuli
+    title: Korean Monosyllabic Speech Perception Test Dataset
+    korean_title: 한국어 단음절 말지각검사 데이터 셋트
+    homepage: https://huggingface.co/datasets/K-University-AIED/korean_monosyllabic_speech
+    kind: huggingface_dataset
+    repo_id: K-University-AIED/korean_monosyllabic_speech
+    repo_type: dataset
+    # Pinned commit sha observed via https://huggingface.co/api/datasets/<repo_id>
+    revision: 280884ae9e6a6c00d6591db11c3771aa9a052e08
+    license: CC-BY-NC-ND-4.0
+    license_source: dataset card `license:` front-matter + License section
+    verified_at: 2026-08-16
+    creator_contact: Woojae Han <woojaehan@hallym.ac.kr>
+    # The dataset card states: "User should inform the creator of the intended use and
+    # scope before using the dataset." This is a HUMAN step. The fetcher refuses to run
+    # without an explicit local acknowledgement. The software never sends the email.
+    requires_human_acknowledgement: true
+    acknowledgement_env: AUDIRE_PRIMARY_DATA_USE_NOTIFIED
+    expected:
+      metadata_file: metadata.csv        # NOTE: card text says `updated_metadata.csv`; the
+                                          # actual tracked file is `metadata.csv` (verified
+                                          # 2026-08-16 via the repo file listing).
+      audio_dir: audio_files
+      n_utterances: 726
+      n_speakers: 2
+      per_speaker_utterances: 363
+      sample_rate_hz: 16000
+      metadata_columns:
+        - "Audio Sample ID"
+        - "Speaker Gender_Pronounced Answer"
+        - "Syllable "                      # trailing space is present in the real header
+        - "Total Duration"
+        - "Mean Pitch"
+        - "F1"
+        - " F2 (Hz)"
+        - " F3 (Hz)"
+        - "file_name"
+    permitted_uses:
+      - local calibration stimulus playback
+      - stimulus identifier / syllable-structure reference
+      - acoustic-feature (duration, pitch, formant) sensitivity analysis
+    prohibited_uses:
+      - committing audio or metadata to this repository
+      - redistributing modified or derived audio (ND clause)
+      - creating noise-mixed derivative corpora for release (ND clause)
+      - commercial use (NC clause)
+      - implying the public release contains the 72 participants' row-level responses
+
+  - id: zeroth_korean_test
+    role: korean_sentence_asr_evaluation
+    title: Zeroth-Korean (test split)
+    homepage: https://www.openslr.org/40/
+    mirror: https://huggingface.co/datasets/kresnik/zeroth_korean
+    kind: huggingface_dataset
+    repo_id: kresnik/zeroth_korean
+    repo_type: dataset
+    revision: 1fe937899f828af822293d05e086200946088bdf
+    license: CC-BY-4.0
+    license_source: >-
+      Stated in the dataset card body ("This dataset is distributed under the CC BY 4.0
+      license") and by the upstream OpenSLR SLR40 page. NOTE: the Hugging Face
+      `cardData.license` front-matter field is ABSENT on the mirror (verified 2026-08-16),
+      so the machine-readable license tag cannot be relied on; the body text and the
+      upstream OpenSLR record are the authority.
+    verified_at: 2026-08-16
+    requires_human_acknowledgement: false
+    expected:
+      split: test
+      n_rows: 457
+      sample_rate_hz: 16000
+      n_speakers_test: 10
+      dataset_version: 2.0.0
+      parquet_file: data/test-00000-of-00001.parquet
+    permitted_uses:
+      - ASR regression / word-timestamp testing
+      - end-to-end selective-caption regression
+      - reproducible noise/SNR mixing (CC BY permits derivatives with attribution)
+    prohibited_uses:
+      - committing audio to this repository
+
+  - id: hapaa_audiology
+    role: auxiliary_audiology_schema
+    title: A FAIR and Open-Access Database of Audiological Perceptual Measures
+    homepage: https://zenodo.org/records/17091997
+    kind: zenodo_record
+    record_id: "17091997"
+    doi: 10.5281/zenodo.17091997
+    license: CC-BY-4.0
+    license_source: Zenodo API `metadata.license.id` == "cc-by-4.0"
+    publication_date: 2025-09-09
+    verified_at: 2026-08-16
+    requires_human_acknowledgement: false
+    expected:
+      files:
+        - "General Information.zip"
+        - "Source and Excel files.zip"
+        - "SQL files.zip"
+    permitted_uses:
+      - audiological variable schema design
+      - plausibility checks on relationships among general audiological measures
+      - auxiliary sensitivity analysis, clearly labelled as non-Korean
+    prohibited_uses:
+      - treating its speech labels as Korean phoneme-confusion ground truth
+      - deriving Korean onset/nucleus/coda priors from it
+
+# ---------------------------------------------------------------------------
+# Literature sources. These are NOT downloaded. They are cited evidence whose
+# transcribed aggregate values live in `data/literature/` with per-value provenance.
+# ---------------------------------------------------------------------------
+literature:
+  - id: joo2026_error_rates
+    doi: 10.21848/asr.250214
+    title: >-
+      Perceptual Error Analysis of Korean Monosyllabic Word Recognition I:
+      Error Rates and Types According to Hearing Level
+    authors: Joo, Kim, Ma, Park, Lee, Han
+    journal: Audiology and Speech Research
+    year: 2026
+    volume_issue_pages: 22(1):21-33
+    url: http://e-asr.org/journal/view.php?doi=10.21848/asr.250214
+    accessed: 2026-08-16
+    use: literature-informed prior for group-level error rates; sanity check
+    do_not: invent or redistribute participant-level responses
+
+  - id: ma2026_similarity
+    doi: 10.21848/asr.250216
+    title: >-
+      Perceptual Error Analysis of Korean Monosyllabic Word Recognition II:
+      Similarity and Distance According to Hearing Level
+    authors: Ma, Kim, Joo, Park, Yoon, Han
+    journal: Audiology and Speech Research
+    year: 2026
+    volume_issue_pages: 22(1):34-41
+    url: http://e-asr.org/journal/view.php?doi=10.21848/asr.250216
+    accessed: 2026-08-16
+    use: >-
+      confusion-structure prior (within-class confusion strength, position-dependent
+      perceptual distance shrinkage with hearing level)
+    do_not: treat reported group means as individual-listener matrices
+
+  - id: kim2015_ksmwla_reliability
+    doi: 10.7874/jao.2015.19.2.68
+    title: >-
+      Test-Retest Reliability of Word Recognition Score Using Korean Standard
+      Monosyllabic Word Lists for Adults as a Function of the Number of Test Words
+    authors: Kim, Lee, Lee, Bahng, Lee, Choi, Cho, Shin, Park
+    journal: Journal of Audiology & Otology
+    year: 2015
+    volume_issue_pages: 19(2):68-73
+    url: https://pmc.ncbi.nlm.nih.gov/articles/PMC4582455/
+    accessed: 2026-08-16
+    use: >-
+      SRT/WRS construct definitions and the external reliability ceiling used to
+      constrain claims in the calibration-length study (E5)
+    do_not: >-
+      claim that a short AUDIRE calibration is equivalent to a standardized clinical
+      KS-MWL-A word recognition score

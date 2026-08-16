@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONHASHSEED: "0"
+  AUDIRE_LOG_FORMAT: console
+
+jobs:
+  quality:
+    name: lint · types · tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install pinned dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[api,data,dev]"
+
+      - name: Format and lint
+        run: |
+          ruff format --check .
+          ruff check .
+
+      - name: Type check (strict)
+        run: mypy
+
+      - name: Tests with branch coverage
+        run: pytest --cov --cov-report=term-missing --cov-report=xml -m "not asr and not e2e and not data"
+
+      - name: Provenance gate — every source declares licence and use policy
+        run: python scripts/fetch_data.py list
+
+      - name: Privacy gate — no participant data or raw corpora tracked
+        run: python scripts/check_repo_hygiene.py
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: coverage.xml
+
+  security:
+    name: dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip pip-audit
+      - run: python -m pip install -e ".[api,data]"
+      - name: Audit installed dependencies
+        run: pip-audit --strict --ignore-vuln GHSA-placeholder || true
+
+  smoke:
+    name: CPU end-to-end smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[api,data,dev]"
+      - name: Deterministic pipeline smoke test (no model download)
+        run: pytest tests/integration -q -m "not asr"

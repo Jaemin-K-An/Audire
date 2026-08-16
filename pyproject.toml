@@ -1,0 +1,146 @@
+[build-system]
+requires = ["setuptools>=80", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "audire"
+version = "0.1.0"
+description = "Personalized prediction of Korean word misrecognition for selective captioning"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Project AUDIRE" }]
+keywords = ["audiology", "korean", "speech-perception", "captioning", "hearing-loss"]
+classifiers = [
+  "Programming Language :: Python :: 3.12",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering",
+]
+
+# Versions verified against PyPI on 2026-08-16. See docs/DECISIONS.md ADR-0002.
+dependencies = [
+  "numpy==2.5.2",
+  "scipy==1.18.0",
+  "pandas==3.0.5",
+  "scikit-learn==1.9.0",
+  "matplotlib==3.11.1",
+  "joblib==1.5.3",
+  "pydantic==2.13.4",
+  "PyYAML==6.0.3",
+  "typer==0.27.1",
+  "structlog==26.1.0",
+]
+
+[project.optional-dependencies]
+api = [
+  "fastapi==0.141.1",
+  "uvicorn[standard]==0.52.3",
+  "python-multipart==0.0.32",
+  "jinja2==3.1.6",
+]
+asr = [
+  "faster-whisper==1.2.1",
+  "ctranslate2==4.8.1",
+  "soundfile==0.14.0",
+  "av==18.1.0",
+]
+data = [
+  "huggingface-hub==1.27.0",
+  "datasets==5.0.1",
+  "pyarrow==25.0.1",
+  "requests==2.33.0",
+]
+dev = [
+  "pytest==9.1.1",
+  "pytest-cov==7.1.0",
+  "hypothesis==6.165.9",
+  "httpx==0.28.1",
+  "ruff==0.16.3",
+  "mypy==2.3.1",
+  "pandas-stubs",
+  "types-PyYAML",
+  "types-requests",
+]
+e2e = [
+  "playwright==1.62.0",
+  "pytest-playwright==0.9.0",
+]
+
+[project.scripts]
+audire = "audire.cli:app"
+
+[project.urls]
+Documentation = "https://github.com/audire/audire/tree/main/docs"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["audire*"]
+
+[tool.setuptools.package-data]
+audire = ["py.typed", "resources/*.yaml", "resources/*.json"]
+
+# ---------------------------------------------------------------------------
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+addopts = "-q --strict-markers --strict-config"
+markers = [
+  "slow: takes more than ~5 seconds",
+  "asr: requires the ASR backend and a downloadable model",
+  "e2e: requires a running API server and a browser",
+  "data: requires locally fetched external data",
+]
+filterwarnings = ["error::DeprecationWarning:audire.*"]
+
+[tool.coverage.run]
+branch = true
+source = ["src/audire"]
+omit = ["*/__main__.py"]
+
+[tool.coverage.report]
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "raise NotImplementedError",
+  "@overload",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests", "apps", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "SIM", "ARG", "PTH", "RUF"]
+ignore = [
+  "N803",  # audiology/statistics notation uses capitalised argument names (C_u, PTA)
+  "N806",
+  "N818",  # domain exceptions read better without an -Error suffix (AcknowledgementRequired)
+  "RUF001", # Korean/ambiguous-unicode strings are the subject matter
+  "RUF002",
+  "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ARG001", "ARG002"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src/audire", "apps", "scripts"]
+strict = true
+warn_unreachable = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = [
+  "sklearn.*",
+  "scipy.*",
+  "matplotlib.*",
+  "faster_whisper.*",
+  "soundfile.*",
+  "datasets.*",
+  "huggingface_hub.*",
+  "joblib.*",
+  "pyarrow.*",
+]
+ignore_missing_imports = true
