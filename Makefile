@@ -12,8 +12,8 @@ PORT ?= 8000
 
 .DEFAULT_GOAL := help
 .PHONY: help bootstrap lock data data-verify test test-fast lint typecheck audit \
-        simulate train eval caption-eval reproduce run e2e figures clean package \
-        check gates
+        simulate eval eval-smoke caption-eval sensitivity reproduce run e2e \
+        figures smoke clean package check
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -80,36 +80,33 @@ check: lint typecheck test ## Everything CI runs
 
 # --------------------------------------------------------------------------- research
 
-simulate: ## Generate the synthetic listener/trial cohorts declared in experiments/configs
-	$(PYTHON) -m audire.cli simulate --config experiments/configs/simulation_main.yaml
+simulate: ## Generate the synthetic cohorts declared in the main experiment config
+	$(PYTHON) -m audire.cli simulate --config experiments/configs/rq1_main.yaml
 
-train: ## Fit the risk models on the pinned cohort
-	$(PYTHON) -m audire.cli train --config experiments/configs/model_main.yaml
+eval: ## RQ1/RQ2/RQ3 — listener-level ablation, caption budgets and thresholds
+	$(PYTHON) -m audire.cli evaluate --config experiments/configs/rq1_main.yaml
 
-eval: ## RQ1 — listener-level ablation with calibration metrics
-	$(PYTHON) -m audire.cli evaluate --config experiments/configs/ablation_rq1.yaml
+eval-smoke: ## Fast deterministic run used by CI
+	$(PYTHON) -m audire.cli evaluate --config experiments/configs/smoke.yaml
 
-caption-eval: ## RQ2/RQ3 — caption budget Pareto and personalized thresholds
-	$(PYTHON) -m audire.cli caption-eval --config experiments/configs/caption_rq2.yaml
+caption-eval: ## RQ2/RQ3 — caption budget Pareto frontier and personalized thresholds
+	$(PYTHON) -m audire.cli caption-eval --config experiments/configs/rq1_main.yaml
 
-sensitivity: ## E5/E8 — calibration length, SNR and subgroup sweeps
+sensitivity: ## E11 — idiosyncrasy x calibration-length sweep
 	$(PYTHON) -m audire.cli sensitivity --config experiments/configs/sensitivity.yaml
 
 figures: ## Regenerate every figure and table from recorded experiment artifacts
 	$(PYTHON) -m audire.cli figures --all
 
-reproduce: ## Full research reproduction: simulate -> train -> eval -> caption -> figures
-	$(MAKE) simulate
-	$(MAKE) train
+reproduce: ## Full research reproduction: eval -> sensitivity -> figures
 	$(MAKE) eval
-	$(MAKE) caption-eval
 	$(MAKE) sensitivity
 	$(MAKE) figures
 	@echo "reproduction complete; see docs/RESULTS.md and experiments/artifacts/"
 
 # --------------------------------------------------------------------------- application
 
-run: ## Start the local API + web application
+run: ## Start the local API + web application (G6 — apps/api not implemented yet)
 	$(BIN)/uvicorn apps.api.main:app --host $(HOST) --port $(PORT)
 
 run-dev: ## Start with autoreload

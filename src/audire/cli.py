@@ -112,6 +112,42 @@ def caption_eval(config: ConfigOpt) -> None:
 
 
 @app.command()
+def sensitivity(config: ConfigOpt) -> None:
+    """E11 — 개인 특이성 x 교정 길이 민감도 스윕을 실행합니다."""
+    from audire.experiments.sensitivity import SensitivityConfig, run_sensitivity
+
+    cfg = SensitivityConfig.load(config)
+    result = run_sensitivity(cfg)
+    summary = result["summary"]
+
+    typer.echo(f"\nrun_id: {result['run_id']}   격자 칸 수: {summary['n_cells']}\n")
+    typer.echo(
+        f"{'집중도':>8s} {'교정길이':>9s} {'arm':26s} {'PR-AUC':>8s} "
+        f"{'재현율':>8s} {'단어길이대비':>12s} {'이긴시드':>9s}"
+    )
+    typer.echo("-" * 90)
+    for g in summary["grid"]:
+        typer.echo(
+            f"{g['dirichlet_concentration']:8.1f} {g['n_calibration_trials']:9d} "
+            f"{g['arm']:26s} {g['pr_auc_mean']:8.4f} {g['misheard_recall_mean']:8.4f} "
+            f"{g['recall_over_word_length_mean']:+12.4f} "
+            f"{g['n_seeds_beating_word_length']:4d}/{g['n_seeds']:<4d}"
+        )
+    head = summary["headline"]
+    typer.echo(
+        f"\n개인화가 모든 시드에서 단어길이 휴리스틱을 이긴 칸: "
+        f"{head['n_cells_where_personalization_always_beats_word_length']}"
+        f"/{head['n_combined_cells']}"
+    )
+    for w in head["winning_cells"]:
+        typer.echo(
+            f"  집중도={w['dirichlet_concentration']} 교정길이={w['n_calibration_trials']} "
+            f"이득={w['gain']:+.4f}"
+        )
+    typer.echo(f"\n단서: {head['caveat']}")
+
+
+@app.command()
 def runs() -> None:
     """List recorded experiment runs with their provenance."""
     from audire.experiments.registry import load_runs

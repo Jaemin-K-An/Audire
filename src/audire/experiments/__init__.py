@@ -11,10 +11,12 @@ from audire.experiments.registry import (
     save_artifact,
 )
 from audire.experiments.runner import ExperimentConfig, run_experiment
+from audire.experiments.sensitivity import SensitivityConfig, run_sensitivity
 
 __all__ = [
     "ExperimentConfig",
     "RunRecord",
+    "SensitivityConfig",
     "append_run",
     "fail_run",
     "finish_run",
@@ -22,5 +24,6 @@ __all__ = [
     "load_runs",
     "new_run",
     "run_experiment",
+    "run_sensitivity",
     "save_artifact",
 ]
