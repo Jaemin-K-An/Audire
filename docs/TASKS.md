@@ -84,15 +84,22 @@ Legend: ✅ done · 🟡 partial · ⬜ not started · 🚫 externally blocked
 | Caption-budget Pareto study (RQ2) | ✅ | per-listener **and** pooled |
 | Personalized vs global threshold (RQ3) | ✅ | with the equity view |
 
-## G5 — end-to-end ASR ⬜ NOT STARTED
+## G5 — end-to-end ASR ✅ (real weights not yet exercised here)
 
-| item | status | note |
+| item | status | evidence |
 |---|---|---|
-| Replaceable ASR adapter interface | ⬜ | contract defined in ADR-0010, not implemented |
-| `faster-whisper` backend with word timestamps | ⬜ | 1.2.1 verified to exist (py≥3.9) but not wired |
-| Media ingest (wav / mp3 / mp4) | ⬜ | ffmpeg 7.1.1 present on this host |
-| WER reported separately from mishearing error | ⬜ | contract defined, never exercised |
-| CPU-only E2E smoke test | ⬜ | |
+| Replaceable ASR adapter interface | ✅ | `ASRBackend`, `Token`, `Transcript` |
+| `faster-whisper` backend with word timestamps | ✅ | written against the verified current API |
+| Per-token confidence kept separate from risk | ✅ | `None` when absent, never fabricated |
+| Word-timestamp defects surfaced, not swallowed | ✅ | `Transcript.timing_problems()` |
+| Missing weights fail loudly, never degrade silently | ✅ | `ASRUnavailable` with an actionable message |
+| Replay backend for deterministic CI | ✅ | preserves the original recogniser's identity |
+| Non-Hangul tokens kept and flagged, not dropped | ✅ | `meta.reason_not_scored` |
+| Incomplete profile / thin calibration refused | ✅ | `check_ready`, ≥10 trials |
+| CPU-only E2E smoke test (no model download) | ✅ | 21 integration tests |
+| **Real `faster-whisper` weights run on audio** | ⬜ | `@pytest.mark.asr` tests exist but have **not** been executed against downloaded weights on this machine |
+| WER reported separately from mishearing error | ⬜ | contract in place; E7 regression not run |
+| Media ingest verified for mp3/mp4 | ⬜ | ffmpeg 7.1.1 present; not exercised |
 
 ## G6 — complete user system ⬜ NOT STARTED
 

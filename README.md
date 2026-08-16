@@ -30,13 +30,13 @@ tested rather than assumed.
 |---|---|---|
 | G0 | Evidence, licences, provenance, data layer | complete |
 | G1 | Hangul engine, response parser, confusion matrices | complete |
-| G2 | HearingProfile + synthetic simulation | in progress |
-| G3 | Risk models, calibration, listener-level evaluation | pending |
-| G4 | Selective caption engine + exports | pending |
-| G5 | ASR end-to-end | pending |
-| G6 | Complete user system | pending |
-| G7 | Validation and sensitivity | pending |
-| G8 | Reproducible release | pending |
+| G2 | HearingProfile + synthetic simulation | complete |
+| G3 | Risk models, calibration, listener-level evaluation | complete |
+| G4 | Selective caption engine + exports | complete |
+| G5 | ASR adapter + end-to-end pipeline | complete (real weights not yet run here) |
+| G6 | Complete user system (API + web) | **not started** |
+| G7 | Validation and sensitivity | partial — key sweeps not run |
+| G8 | Reproducible release | partial — `make reproduce` chain incomplete |
 
 `docs/TASKS.md` is the live ledger. No gate below G8 may be described as a finished product.
 
@@ -82,8 +82,8 @@ src/audire/
   sim/          synthetic listener and trial generators (every row is_synthetic=true)
   eval/         metrics, bootstrap CIs, ablations, figures
   data/         source registry, fetchers, manifests, stimulus catalogues
-apps/api/       FastAPI application
-apps/web/       browser client (calls the real pipeline, no mocks)
+apps/api/       FastAPI application            (G6 — NOT YET IMPLEMENTED)
+apps/web/       browser client                 (G6 — NOT YET IMPLEMENTED)
 experiments/    preregistered configs; artifacts are regenerated, never committed
 data/manifests/ provenance for every acquired byte
 docs/           research plan, decisions, risks, claims, results
@@ -124,13 +124,17 @@ audio nor its metadata is ever committed or redistributed (ND clause).
 ## Reproducibility
 
 ```bash
-make reproduce
+make eval      # preregistered ablation + caption + threshold studies, all seeds
+make figures   # regenerate every table and figure from the recorded artifacts alone
 ```
 
-runs simulate → train → eval → caption-eval → sensitivity → figures. Every experiment records
-its git SHA, config, seed list, dependency lock hash, data manifest ids, metrics and logs into
-`experiments/registry.yaml`, so every reported number can be traced to the bytes and code that
-produced it.
+Every run records its git SHA, a **git-dirty flag**, the config, the seed list, the dependency
+lock hash, the data-manifest content digests, the metrics and the artifact paths into
+`experiments/registry.yaml`, so every reported number traces to the bytes and code that
+produced it. Failed runs are recorded too.
+
+`make reproduce` additionally calls a `sensitivity` target that is **not yet implemented** —
+see `docs/TASKS.md`.
 
 ---
 
