@@ -6,6 +6,7 @@ local parquet shard and never copied into the repository.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -51,7 +52,10 @@ def load_zeroth_transcripts() -> list[str]:
 
 
 def load_zeroth_utterances(
-    limit: int | None = None, *, with_audio: bool = False
+    limit: int | None = None,
+    *,
+    indices: Sequence[int] | None = None,
+    with_audio: bool = False,
 ) -> list[ZerothUtterance]:
     """Load utterances from the pinned test split in file order (deterministic).
 
@@ -60,10 +64,16 @@ def load_zeroth_utterances(
     """
     import pyarrow.parquet as pq
 
+    if limit is not None and indices is not None:
+        raise ValueError("specify either limit or indices, not both")
     columns = ["id", "speaker_id", "text"] + (["audio"] if with_audio else [])
     table = pq.read_table(_parquet_path(), columns=columns)
     if limit is not None:
         table = table.slice(0, limit)
+    elif indices is not None:
+        if any(index < 0 or index >= len(table) for index in indices):
+            raise IndexError(f"utterance indices must be within 0..{len(table) - 1}")
+        table = table.take(list(indices))
 
     ids = table.column("id").to_pylist()
     speakers = table.column("speaker_id").to_pylist()

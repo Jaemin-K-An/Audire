@@ -215,6 +215,13 @@ def fetch_source(
     if manifest_path.exists() and not force:
         existing = Manifest.load(source.id)
         problems = existing.verify(deep=deep_verify)
+        if existing.revision != source.revision:
+            problems.append(
+                f"registry revision changed: manifest={existing.revision!r}, "
+                f"registry={source.revision!r}"
+            )
+        if existing.expected != dict(source.expected):
+            problems.append("registry expectations changed since the manifest was written")
         if not problems:
             log.info("fetch.skip_verified", source=source.id, n_files=existing.n_files)
             return existing

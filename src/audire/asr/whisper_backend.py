@@ -30,6 +30,11 @@ log = get_logger(__name__)
 #: can run the end-to-end path without a long download. Override per deployment.
 DEFAULT_MODEL_ID = "small"
 
+#: Immutable Hugging Face commit for ``Systran/faster-whisper-small``. Verified from the
+#: model API on 2026-08-16; see ADR-0013. A named size without a revision otherwise follows
+#: the repository's moving default branch and cannot be reproduced.
+DEFAULT_MODEL_REVISION = "536b0662742c02347bc0e980a01041f333bce120"
+
 #: Pinned decode options, recorded in provenance.
 DEFAULT_DECODE_OPTIONS: dict[str, Any] = {
     "beam_size": 5,
@@ -48,12 +53,20 @@ class FasterWhisperBackend(ASRBackend):
         self,
         model_id: str = DEFAULT_MODEL_ID,
         *,
+        model_revision: str | None = None,
         device: str = "cpu",
         compute_type: str = "int8",
         download_root: Path | None = None,
         decode_options: dict[str, Any] | None = None,
     ) -> None:
         self.model_id = model_id
+        self.model_revision = (
+            model_revision
+            if model_revision is not None
+            else DEFAULT_MODEL_REVISION
+            if model_id == DEFAULT_MODEL_ID
+            else None
+        )
         self.device = device
         self.compute_type = compute_type
         self.download_root = download_root or models_dir()
@@ -95,6 +108,7 @@ class FasterWhisperBackend(ASRBackend):
                 device=self.device,
                 compute_type=self.compute_type,
                 download_root=str(self.download_root),
+                revision=self.model_revision,
             )
         except Exception as exc:
             raise ASRUnavailable(
@@ -181,6 +195,7 @@ class FasterWhisperBackend(ASRBackend):
             "backend": self.name,
             "library_version": version,
             "model_id": self.model_id,
+            "model_revision": self.model_revision,
             "device": self.device,
             "compute_type": self.compute_type,
             "decode_options": dict(self.decode_options),

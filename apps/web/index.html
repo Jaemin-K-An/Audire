@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AUDIRE · 개인화 선택 자막</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header>
+      <p class="eyebrow">KOREAN SELECTIVE CAPTIONING</p>
+      <h1>AUDIRE</h1>
+      <p class="lede">개인의 청각 프로필과 음소 혼동을 분리해 단어별 오청 위험을 설명합니다.</p>
+      <div class="notice">
+        연구·접근성 소프트웨어이며 의료기기가 아닙니다. 진단이나 임상 효능을 제공하지 않습니다.
+      </div>
+    </header>
+
+    <main>
+      <section class="status-card" aria-labelledby="status-title">
+        <div>
+          <p class="step">SYSTEM</p>
+          <h2 id="status-title">실행 준비 상태</h2>
+        </div>
+        <output id="status" class="pill">확인 중</output>
+      </section>
+
+      <section aria-labelledby="profile-title">
+        <p class="step">01 · PROFILE</p>
+        <h2 id="profile-title">청각 프로필</h2>
+        <p>직접 식별자가 아닌 영문·숫자 ID를 사용하세요. 입력은 로컬 private 디렉터리에만 저장됩니다.</p>
+        <label for="profile-json">HearingProfile JSON</label>
+        <textarea id="profile-json" rows="12" spellcheck="false"></textarea>
+        <div class="actions">
+          <button id="example-profile" class="secondary">입력 예시</button>
+          <button id="save-profile">프로필 저장</button>
+        </div>
+        <label for="listener">현재 프로필</label>
+        <select id="listener"><option value="">프로필을 먼저 저장하세요</option></select>
+      </section>
+
+      <section aria-labelledby="calibration-title">
+        <p class="step">02 · CALIBRATION</p>
+        <h2 id="calibration-title">한국어 단음절 교정</h2>
+        <p>브라우저 음성합성은 수준 교정된 임상 자극이 아닙니다. 들은 음절을 그대로 입력하세요.</p>
+        <div class="inline-fields">
+          <label>문항 수 <input id="calibration-count" type="number" min="10" max="100" value="25" /></label>
+          <button id="start-calibration">교정 시작</button>
+        </div>
+        <form id="calibration-form" class="calibration-list"></form>
+        <button id="submit-calibration" hidden>응답 저장</button>
+      </section>
+
+      <section aria-labelledby="media-title">
+        <p class="step">03 · CAPTION</p>
+        <h2 id="media-title">미디어 처리</h2>
+        <form id="media-form">
+          <label>한국어 오디오·비디오 <input name="media" type="file" accept=".wav,.mp3,.mp4,.m4a,.flac,.ogg" required /></label>
+          <div class="inline-fields">
+            <label>정책
+              <select name="policy"><option value="budget">고정 예산</option><option value="threshold">확률 임계값</option><option value="full">전체 자막</option></select>
+            </label>
+            <label>예산 <input name="budget" type="number" min="0" max="1" step="0.05" value="0.20" /></label>
+            <label>임계값 <input name="tau" type="number" min="0" max="1" step="0.05" value="0.50" /></label>
+          </div>
+          <button type="submit">선택 자막 생성</button>
+        </form>
+        <div id="result" class="result" hidden>
+          <h3>결과</h3>
+          <div id="metrics" class="metrics"></div>
+          <div id="words" class="words"></div>
+          <div class="actions">
+            <button data-download="srt" class="secondary">SRT 받기</button>
+            <button data-download="ass" class="secondary">ASS 받기</button>
+            <button data-download="json" class="secondary">JSON 받기</button>
+          </div>
+        </div>
+      </section>
+
+      <output id="message" role="status" aria-live="polite"></output>
+    </main>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>
+

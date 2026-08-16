@@ -360,3 +360,481 @@ runs:
   finished_at_utc: '2026-08-16T05:48:46.331744+00:00'
   error: null
   notes: 민감도 스윕 코드 경로 검증용 최소 격자
+- run_id: rq1_main-20260816T051829Z-0de3701
+  experiment: rq1_main
+  started_at_utc: '2026-08-16T05:18:29.721505+00:00'
+  git_sha: 0de37010c6df056f51c7230475977408813ea16f
+  git_dirty: true
+  lock_hash: d8d2ae59c1bdb174
+  python: 3.12.9
+  platform: Darwin arm64
+  seeds:
+  - 101
+  - 202
+  - 303
+  - 404
+  - 505
+  config:
+    name: rq1_main
+    description: Listener-level ablation of clinical vs individual-confusion features for word-level Korean
+      mishearing prediction, with the matched-budget caption study and the personalized-versus-global
+      threshold comparison.
+    simulation:
+      name: rq1_main_cohort
+      seeds:
+      - 101
+      - 202
+      - 303
+      - 404
+      - 505
+      n_listeners: 80
+      n_calibration_trials: 100
+      n_word_trials: 250
+      snr_conditions_db:
+      - 20.0
+      speakers:
+      - male
+      - female
+      severity:
+        evidence: literature
+        evidence_source: joo2026_error_rates
+        rationale: Group sizes mirror the reference study's design (20 normal / 20 mild / 20 moderate
+          / 12 severe, n=72) so that the simulated cohort has a comparable shape. This fixes the *proportions*,
+          not any listener's behaviour.
+        scheme: korean_study_4group
+        weights:
+          normal: 20.0
+          mild: 20.0
+          moderate: 20.0
+          severe: 12.0
+      audiogram:
+        evidence: clinical_convention
+        evidence_source: null
+        rationale: Age-related hearing loss in older adults characteristically slopes downward toward
+          high frequencies. The stratum PTA windows follow the named severity scheme; the slope and noise
+          magnitudes are chosen to produce realistic-looking but not evidence-derived audiogram shapes.
+        pta_window_db:
+          normal:
+          - 5.0
+          - 19.0
+          mild:
+          - 20.0
+          - 34.0
+          moderate:
+          - 35.0
+          - 49.0
+          moderately_severe:
+          - 50.0
+          - 64.0
+          severe:
+          - 65.0
+          - 85.0
+          profound:
+          - 86.0
+          - 100.0
+        slope_db_per_octave_mean: 6.0
+        slope_db_per_octave_sd: 3.0
+        threshold_noise_db_sd: 4.0
+        interaural_asymmetry_db_sd: 5.0
+        pta_method: pta4_500_1000_2000_4000
+      speech:
+        evidence: literature
+        evidence_source: joo2026_error_rates
+        rationale: Monosyllable correct-response rates per hearing group are anchored to the reference
+          study's reported total error rates (normal 18.3 %, mild 27.8 %, moderate 48.4 %, severe 80.4
+          % errors at MCL over 726 monosyllables), i.e. correct rates of 81.7 / 72.2 / 51.6 / 19.6 %.
+          SRT-PTA agreement is a clinical convention rather than a finding. The within-group spread is
+          an assumption.
+        accuracy_by_stratum:
+          normal: 0.817
+          mild: 0.722
+          moderate: 0.516
+          moderately_severe: 0.4
+          severe: 0.196
+          profound: 0.1
+        ability_sd_logit: 0.55
+        srt_minus_pta_mean_db: 0.0
+        srt_minus_pta_sd_db: 5.0
+        wrs_n_words: 50
+        pbmax_increment_mean: 6.0
+        pbmax_increment_sd: 4.0
+        p_has_pi_function: 0.5
+        p_has_loudness: 0.6
+        mcl_above_pta_db: 30.0
+        mcl_sd_db: 6.0
+        dynamic_range_db_mean: 30.0
+        dynamic_range_db_sd: 8.0
+      confusion:
+        evidence: literature
+        evidence_source: ma2026_similarity
+        rationale: The reference study reports that perceptual distance between phonemes shrinks as hearing
+          loss increases (onset 5.43 -> 3.05, nucleus 5.51 -> 3.53, coda 5.78 -> 3.66 from normal to severe)
+          and that confusions concentrate within phonetic classes. This motivates (a) within-class concentration
+          via a similarity kernel and (b) a concentration parameter that rises with severity. The specific
+          beta values and the Dirichlet concentration are assumptions.
+        position_difficulty:
+          onset: 1.15
+          nucleus: 0.7
+          coda: 1.15
+        similarity_beta_normal: 1.5
+        similarity_beta_severe: 4.0
+        dirichlet_concentration: 40.0
+        no_response_share: 0.05
+      trials:
+        evidence: assumption
+        evidence_source: null
+        rationale: 'Lexical repair, word-length effects and SNR effects are declared assumptions with
+          no numeric source. Their purpose is twofold. First, they make the generative process differ
+          structurally from the phoneme-independence scoring model, so that comparing the two is informative
+          rather than circular. Second, they bridge the gap between the context-free monosyllable task
+          the literature measures and the connected speech AUDIRE captions: a listener who misses one
+          segment of a word in running speech often still identifies it. The resulting word-level mishearing
+          base rate is therefore a CONFIGURED property of the simulation, is reported in every cohort
+          summary, and is swept explicitly in the sensitivity study rather than treated as a fixed fact.'
+        lexical_repair_base: 0.55
+        lexical_repair_per_extra_syllable: 0.12
+        lexical_repair_max: 0.9
+        lexical_repair_multi_error: 0.15
+        snr_logit_per_db: 0.06
+        reference_snr_db: 20.0
+        speaker_effects:
+          male: -0.1
+          female: 0.1
+          synthetic_tts: 0.0
+      words:
+        evidence: assumption
+        evidence_source: null
+        rationale: The synthetic word generator samples syllable counts from a distribution that resembles
+          Korean eojeol length in running text but is not measured from a corpus. Use `source='zeroth'`
+          to draw words from the CC BY-licensed Zeroth-Korean transcripts instead when a real distribution
+          matters.
+        source: synthetic
+        syllable_count_weights:
+          '1': 0.2
+          '2': 0.45
+          '3': 0.25
+          '4': 0.1
+        vocabulary_size: 400
+    arms:
+    - word_context_only
+    - pta_only
+    - clinical
+    - confusion_only
+    - clinical_plus_confusion
+    models:
+    - logistic
+    - phoneme_independence
+    - gradient_boosting
+    n_splits: 5
+    calibration: none
+    n_bootstrap: 1000
+    ece_bins: 10
+    decision_threshold: 0.5
+    caption_budgets:
+    - 0.1
+    - 0.2
+    - 0.3
+    - 0.4
+    - 0.5
+    threshold_targets:
+    - 0.1
+    - 0.2
+    - 0.3
+    contrasts:
+    - - clinical_plus_confusion
+      - clinical
+    - - clinical_plus_confusion
+      - pta_only
+    - - confusion_only
+      - clinical
+    - - clinical_plus_confusion
+      - word_context_only
+    contrast_metrics:
+    - pr_auc
+    - brier
+  data_manifests: {}
+  artifacts:
+  - experiments/artifacts/rq1_main-20260816T051829Z-0de3701/arm_metrics.json
+  - experiments/artifacts/rq1_main-20260816T051829Z-0de3701/contrasts.json
+  - experiments/artifacts/rq1_main-20260816T051829Z-0de3701/caption_frontier.json
+  - experiments/artifacts/rq1_main-20260816T051829Z-0de3701/threshold_comparison.json
+  - experiments/artifacts/rq1_main-20260816T051829Z-0de3701/cohort_summaries.json
+  - experiments/artifacts/rq1_main-20260816T051829Z-0de3701/summary.json
+  metrics:
+    best_arm: clinical_plus_confusion
+    best_pr_auc_mean: 0.6685168914002758
+    n_seeds: 5
+    caveat: Synthetic data. These are engineering and design-sensitivity results, not clinical evidence
+      about human listeners.
+  status: completed
+  finished_at_utc: '2026-08-16T06:13:51.607104+00:00'
+  error: null
+  notes: Listener-level ablation of clinical vs individual-confusion features for word-level Korean mishearing
+    prediction, with the matched-budget caption study and the personalized-versus-global threshold comparison.
+- run_id: sensitivity_idiosyncrasy_calibration-20260816T061412Z-150053c
+  experiment: sensitivity_idiosyncrasy_calibration
+  started_at_utc: '2026-08-16T06:14:12.751265+00:00'
+  git_sha: 150053c903aa3a36b4ecee0402c476b8f87baf00
+  git_dirty: true
+  lock_hash: d8d2ae59c1bdb174
+  python: 3.12.9
+  platform: Darwin arm64
+  seeds:
+  - 101
+  - 202
+  - 303
+  config:
+    name: sensitivity_idiosyncrasy_calibration
+    description: 개인 특이성(디리클레 집중도)과 교정 길이에 대한 2차원 스윕. 개인화 선택 자막이 비개인화 단어길이 휴리스틱을 이기기 시작하는 영역의 경계를 찾는다.
+    base_simulation:
+      name: sensitivity_cohort
+      seeds:
+      - 101
+      - 202
+      - 303
+      n_listeners: 60
+      n_calibration_trials: 100
+      n_word_trials: 200
+      snr_conditions_db:
+      - 20.0
+      speakers:
+      - male
+      - female
+      severity:
+        evidence: literature
+        evidence_source: joo2026_error_rates
+        rationale: Group sizes mirror the reference study's design (20 normal / 20 mild / 20 moderate
+          / 12 severe, n=72) so that the simulated cohort has a comparable shape. This fixes the *proportions*,
+          not any listener's behaviour.
+        scheme: korean_study_4group
+        weights:
+          normal: 20.0
+          mild: 20.0
+          moderate: 20.0
+          severe: 12.0
+      audiogram:
+        evidence: clinical_convention
+        evidence_source: null
+        rationale: Age-related hearing loss in older adults characteristically slopes downward toward
+          high frequencies. The stratum PTA windows follow the named severity scheme; the slope and noise
+          magnitudes are chosen to produce realistic-looking but not evidence-derived audiogram shapes.
+        pta_window_db:
+          normal:
+          - 5.0
+          - 19.0
+          mild:
+          - 20.0
+          - 34.0
+          moderate:
+          - 35.0
+          - 49.0
+          moderately_severe:
+          - 50.0
+          - 64.0
+          severe:
+          - 65.0
+          - 85.0
+          profound:
+          - 86.0
+          - 100.0
+        slope_db_per_octave_mean: 6.0
+        slope_db_per_octave_sd: 3.0
+        threshold_noise_db_sd: 4.0
+        interaural_asymmetry_db_sd: 5.0
+        pta_method: pta4_500_1000_2000_4000
+      speech:
+        evidence: literature
+        evidence_source: joo2026_error_rates
+        rationale: Monosyllable correct-response rates per hearing group are anchored to the reference
+          study's reported total error rates (normal 18.3 %, mild 27.8 %, moderate 48.4 %, severe 80.4
+          % errors at MCL over 726 monosyllables), i.e. correct rates of 81.7 / 72.2 / 51.6 / 19.6 %.
+          SRT-PTA agreement is a clinical convention rather than a finding. The within-group spread is
+          an assumption.
+        accuracy_by_stratum:
+          normal: 0.817
+          mild: 0.722
+          moderate: 0.516
+          moderately_severe: 0.4
+          severe: 0.196
+          profound: 0.1
+        ability_sd_logit: 0.55
+        srt_minus_pta_mean_db: 0.0
+        srt_minus_pta_sd_db: 5.0
+        wrs_n_words: 50
+        pbmax_increment_mean: 6.0
+        pbmax_increment_sd: 4.0
+        p_has_pi_function: 0.5
+        p_has_loudness: 0.6
+        mcl_above_pta_db: 30.0
+        mcl_sd_db: 6.0
+        dynamic_range_db_mean: 30.0
+        dynamic_range_db_sd: 8.0
+      confusion:
+        evidence: literature
+        evidence_source: ma2026_similarity
+        rationale: The reference study reports that perceptual distance between phonemes shrinks as hearing
+          loss increases (onset 5.43 -> 3.05, nucleus 5.51 -> 3.53, coda 5.78 -> 3.66 from normal to severe)
+          and that confusions concentrate within phonetic classes. This motivates (a) within-class concentration
+          via a similarity kernel and (b) a concentration parameter that rises with severity. The specific
+          beta values and the Dirichlet concentration are assumptions.
+        position_difficulty:
+          onset: 1.15
+          nucleus: 0.7
+          coda: 1.15
+        similarity_beta_normal: 1.5
+        similarity_beta_severe: 4.0
+        dirichlet_concentration: 40.0
+        no_response_share: 0.05
+      trials:
+        evidence: assumption
+        evidence_source: null
+        rationale: 'Lexical repair, word-length effects and SNR effects are declared assumptions with
+          no numeric source. Their purpose is twofold. First, they make the generative process differ
+          structurally from the phoneme-independence scoring model, so that comparing the two is informative
+          rather than circular. Second, they bridge the gap between the context-free monosyllable task
+          the literature measures and the connected speech AUDIRE captions: a listener who misses one
+          segment of a word in running speech often still identifies it. The resulting word-level mishearing
+          base rate is therefore a CONFIGURED property of the simulation, is reported in every cohort
+          summary, and is swept explicitly in the sensitivity study rather than treated as a fixed fact.'
+        lexical_repair_base: 0.55
+        lexical_repair_per_extra_syllable: 0.12
+        lexical_repair_max: 0.9
+        lexical_repair_multi_error: 0.15
+        snr_logit_per_db: 0.06
+        reference_snr_db: 20.0
+        speaker_effects:
+          male: -0.1
+          female: 0.1
+          synthetic_tts: 0.0
+      words:
+        evidence: assumption
+        evidence_source: null
+        rationale: The synthetic word generator samples syllable counts from a distribution that resembles
+          Korean eojeol length in running text but is not measured from a corpus. Use `source='zeroth'`
+          to draw words from the CC BY-licensed Zeroth-Korean transcripts instead when a real distribution
+          matters.
+        source: synthetic
+        syllable_count_weights:
+          '1': 0.2
+          '2': 0.45
+          '3': 0.25
+          '4': 0.1
+        vocabulary_size: 400
+    dirichlet_concentration:
+    - 5.0
+    - 20.0
+    - 80.0
+    calibration_lengths:
+    - 25
+    - 100
+    - 400
+    arms:
+    - word_context_only
+    - clinical
+    - clinical_plus_confusion
+    models:
+    - logistic
+    n_splits: 5
+    n_bootstrap: 200
+    caption_budgets:
+    - 0.2
+  data_manifests:
+    zeroth_korean_test: bee795a15177267a0567c8ae902190c7e8675b4e2ec270d9016a7532d4d1c0b9
+  artifacts:
+  - experiments/artifacts/sensitivity_idiosyncrasy_calibration-20260816T061412Z-150053c/sensitivity_cells.json
+  - experiments/artifacts/sensitivity_idiosyncrasy_calibration-20260816T061412Z-150053c/summary.json
+  metrics:
+    n_cells_where_personalization_always_beats_word_length: 6
+    n_combined_cells: 9
+    winning_cells:
+    - dirichlet_concentration: 5.0
+      n_calibration_trials: 25
+      gain: 0.0152
+    - dirichlet_concentration: 5.0
+      n_calibration_trials: 100
+      gain: 0.0262
+    - dirichlet_concentration: 5.0
+      n_calibration_trials: 400
+      gain: 0.0391
+    - dirichlet_concentration: 20.0
+      n_calibration_trials: 100
+      gain: 0.004
+    - dirichlet_concentration: 20.0
+      n_calibration_trials: 400
+      gain: 0.0102
+    - dirichlet_concentration: 80.0
+      n_calibration_trials: 25
+      gain: 0.0041
+    caveat: 합성 데이터입니다. 개인화가 이득을 내는 영역이 존재하는지에 대한 설계 민감도 결과이며, 사람 청취자에 대한 근거가 아닙니다.
+  status: completed
+  finished_at_utc: '2026-08-16T06:16:43.466894+00:00'
+  error: null
+  notes: 개인 특이성(디리클레 집중도)과 교정 길이에 대한 2차원 스윕. 개인화 선택 자막이 비개인화 단어길이 휴리스틱을 이기기 시작하는 영역의 경계를 찾는다.
+- run_id: asr_zeroth_10speaker-20260816T065158Z-150053c
+  experiment: asr_zeroth_10speaker
+  started_at_utc: '2026-08-16T06:51:58.821545+00:00'
+  git_sha: 150053c903aa3a36b4ecee0402c476b8f87baf00
+  git_dirty: true
+  lock_hash: fe09e6fa2cefa917
+  python: 3.12.9
+  platform: Darwin arm64
+  seeds: []
+  config:
+    name: asr_zeroth_10speaker
+    description: CPU regression baseline for pinned faster-whisper weights on one fixed utterance per
+      Zeroth-Korean test speaker. This is not listener-risk or clinical-efficacy evidence.
+    source_id: zeroth_korean_test
+    selection: first_per_speaker
+    n_utterances: 10
+    language: ko
+    model_id: small
+    model_revision: 536b0662742c02347bc0e980a01041f333bce120
+    device: cpu
+    compute_type: int8
+    normalization: ko-basic-v1
+    selected_indices:
+    - 0
+    - 40
+    - 79
+    - 115
+    - 179
+    - 232
+    - 255
+    - 283
+    - 309
+    - 367
+  data_manifests:
+    zeroth_korean_test: 0b69ffa52399a9bebcf1715faca829ecb4faac8586214e2ba382626efe5f48c7
+  artifacts:
+  - experiments/artifacts/asr_zeroth_10speaker-20260816T065158Z-150053c/asr_evaluation_items.json
+  - experiments/artifacts/asr_zeroth_10speaker-20260816T065158Z-150053c/summary.json
+  metrics:
+    n_utterances: 10
+    n_speakers: 10
+    wer:
+      substitutions: 34
+      deletions: 17
+      insertions: 6
+      reference_units: 146
+      errors: 57
+      rate: 0.3904109589041096
+    cer_no_spaces:
+      substitutions: 46
+      deletions: 4
+      insertions: 2
+      reference_units: 430
+      errors: 52
+      rate: 0.12093023255813953
+    exact_match_rate: 0.0
+    audio_duration_s: 101.3509375
+    runtime_s: 24.25419074902311
+    real_time_factor: 0.23930899256874766
+    n_tokens: 135
+    n_tokens_with_confidence: 135
+    utterances_with_timing_problems: 0
+    n_timing_problems: 0
+  status: completed
+  finished_at_utc: '2026-08-16T06:52:23.176329+00:00'
+  error: null
+  notes: CPU regression baseline for pinned faster-whisper weights on one fixed utterance per Zeroth-Korean
+    test speaker. This is not listener-risk or clinical-efficacy evidence.

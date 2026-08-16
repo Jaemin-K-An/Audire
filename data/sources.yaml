@@ -84,6 +84,11 @@ sources:
       n_speakers_test: 10
       dataset_version: 2.0.0
       parquet_file: data/test-00000-of-00001.parquet
+      # Fetch exactly the evaluation split. The training shards are ~2.8 GB and are not
+      # used anywhere in AUDIRE's ASR regression contract.
+      allow_patterns:
+        - README.md
+        - data/test-00000-of-00001.parquet
     permitted_uses:
       - ASR regression / word-timestamp testing
       - end-to-end selective-caption regression

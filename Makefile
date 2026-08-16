@@ -13,7 +13,7 @@ PORT ?= 8000
 .DEFAULT_GOAL := help
 .PHONY: help bootstrap lock data data-verify test test-fast lint typecheck audit \
         simulate eval eval-smoke caption-eval sensitivity reproduce run e2e \
-        figures smoke clean package check
+        figures model asr-eval smoke clean package check
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -106,7 +106,13 @@ reproduce: ## Full research reproduction: eval -> sensitivity -> figures
 
 # --------------------------------------------------------------------------- application
 
-run: ## Start the local API + web application (G6 — apps/api not implemented yet)
+model: ## Fit the provenance-recorded synthetic deployment model into private/
+	$(PYTHON) -m audire.cli build-model --config experiments/configs/rq1_main.yaml
+
+asr-eval: ## E7 actual ASR WER/CER + timestamp regression on 10 fixed speakers
+	AUDIRE_RUN_REAL_ASR=1 $(PYTHON) -m audire.cli asr-eval --config experiments/configs/asr_eval.yaml
+
+run: ## Start the local API + web application (run `make model` first)
 	$(BIN)/uvicorn apps.api.main:app --host $(HOST) --port $(PORT)
 
 run-dev: ## Start with autoreload

@@ -1,0 +1,15 @@
+# E7 fixed public-corpus ASR regression. Selection happens before inference and uses
+# only file order plus speaker id: the first utterance from each of 10 test speakers.
+name: asr_zeroth_10speaker
+description: >-
+  CPU regression baseline for pinned faster-whisper weights on one fixed utterance per
+  Zeroth-Korean test speaker. This is not listener-risk or clinical-efficacy evidence.
+source_id: zeroth_korean_test
+selection: first_per_speaker
+n_utterances: 10
+language: ko
+model_id: small
+model_revision: 536b0662742c02347bc0e980a01041f333bce120
+device: cpu
+compute_type: int8
+normalization: ko-basic-v1

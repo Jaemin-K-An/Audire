@@ -13,7 +13,7 @@ from typing import Annotated
 import typer
 
 from audire.config.logging import configure_logging, get_logger
-from audire.config.paths import artifacts_dir, ensure_runtime_dirs
+from audire.config.paths import artifacts_dir, ensure_runtime_dirs, private_dir
 
 app = typer.Typer(
     name="audire",
@@ -79,10 +79,12 @@ def evaluate(config: ConfigOpt) -> None:
         )
 
     typer.echo("\npaired listener-level contrasts (mean across seeds):")
-    for c in summary["contrasts"]:
+    # The model column is essential: the same contrast is computed for every model
+    # family, and without it two different rows look like a duplicated result.
+    for c in sorted(summary["contrasts"], key=lambda c: (c["model"], c["metric"], c["arm"])):
         d = c["difference"]
         typer.echo(
-            f"  {c['metric']:7s} {c['arm']:24s} - {c['reference']:22s} = "
+            f"  {c['metric']:7s} {c['model']:20s} {c['arm']:24s} - {c['reference']:22s} = "
             f"{d['mean']:+.4f} +-{d['sd']:.4f}  "
             f"({c['n_seeds_excluding_zero']}/{c['n_seeds']} seeds exclude 0)"
         )
@@ -182,6 +184,46 @@ def figures(
         typer.echo(f"wrote {p}")
     if not paths:
         typer.echo("nothing to regenerate; run `audire evaluate` first")
+
+
+@app.command("build-model")
+def build_model(
+    config: ConfigOpt,
+    out: Annotated[
+        Path | None,
+        typer.Option("--out", help="Private joblib path for the fitted deployment scorer"),
+    ] = None,
+) -> None:
+    """Fit the selected logistic family on all configured synthetic seed cohorts."""
+    from audire.risk.artifact import fit_deployment_artifact
+
+    target = out or (private_dir() / "models" / "audire-logistic.joblib")
+    artifact = fit_deployment_artifact(config)
+    model_path, sidecar = artifact.save(target)
+    typer.echo(f"wrote model: {model_path}")
+    typer.echo(f"wrote provenance: {sidecar}")
+    typer.echo(artifact.metadata["caveat"])
+
+
+@app.command("asr-eval")
+def asr_eval(config: ConfigOpt) -> None:
+    """Run the fixed public-corpus ASR WER/CER and timestamp regression."""
+    from audire.asr.evaluation import ASREvalConfig, run_asr_evaluation
+
+    cfg = ASREvalConfig.load(config)
+    result = run_asr_evaluation(cfg)
+    metrics = result["summary"]["metrics"]
+    typer.echo(f"run_id: {result['run_id']}")
+    typer.echo(
+        f"WER={metrics['wer']['rate']:.4f}  "
+        f"CER(no spaces)={metrics['cer_no_spaces']['rate']:.4f}  "
+        f"RTF={metrics['real_time_factor']:.3f}"
+    )
+    typer.echo(
+        f"timing problems: {metrics['n_timing_problems']} across "
+        f"{metrics['n_utterances']} utterances"
+    )
+    typer.echo(result["summary"]["claim_scope"])
 
 
 @app.command()

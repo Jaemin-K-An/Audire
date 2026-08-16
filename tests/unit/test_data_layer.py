@@ -9,6 +9,8 @@ import pytest
 from audire.data.manifest import Manifest, sha256_file
 from audire.data.sources import (
     AcknowledgementRequired,
+    Source,
+    SourceRegistry,
     SourceUseViolation,
     load_registry,
     registry,
@@ -68,6 +70,14 @@ def test_zeroth_is_cc_by_so_derivatives_are_allowed() -> None:
     src = registry().get("zeroth_korean_test")
     assert src.redistribution_allowed is True
     assert src.requires_human_acknowledgement is False
+
+
+def test_zeroth_fetch_scope_is_the_test_split_only() -> None:
+    src = registry().get("zeroth_korean_test")
+    patterns = list(src.expected["allow_patterns"])
+    assert src.expected["parquet_file"] in patterns
+    assert "README.md" in patterns
+    assert not any("train" in pattern for pattern in patterns)
 
 
 def test_acknowledgement_gate_blocks_until_env_var_is_set(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -210,6 +220,48 @@ def test_sha256_file_matches_hashlib(tmp_path) -> None:
     p = tmp_path / "f"
     p.write_bytes(b"audire" * 1000)
     assert sha256_file(p) == hashlib.sha256(b"audire" * 1000).hexdigest()
+
+
+def test_fetch_does_not_reuse_a_manifest_after_registry_expectations_change(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from audire.data import fetch as fetch_module
+
+    monkeypatch.setenv("AUDIRE_RAW_DIR", str(tmp_path / "raw"))
+    monkeypatch.setenv("AUDIRE_MANIFESTS_DIR", str(tmp_path / "manifests"))
+    source = Source(
+        id="scope-test",
+        role="test",
+        title="scope test",
+        kind="unit_test",
+        license="CC-BY-4.0",
+        verified_at="2026-08-16",
+        revision="rev-1",
+        expected={"allow_patterns": ["test.parquet"]},
+    )
+    reg = SourceRegistry(schema_version=1, sources={source.id: source}, literature={})
+    dest = fetch_module.local_path_for(source)
+    dest.mkdir(parents=True)
+    (dest / "test.parquet").write_bytes(b"fixed")
+    Manifest.build(
+        source_id=source.id,
+        license=source.license,
+        local_path=dest,
+        revision=source.revision,
+        expected={},
+    ).save()
+    called = False
+
+    def fetch_again(_source: Source, _dest) -> dict[str, str]:
+        nonlocal called
+        called = True
+        return {"backend": "unit_test"}
+
+    monkeypatch.setitem(fetch_module._BACKENDS, "unit_test", fetch_again)
+    result = fetch_module.fetch_source(source.id, reg=reg)
+
+    assert called is True
+    assert result.expected == source.expected
 
 
 # =========================================================== stimulus catalogue

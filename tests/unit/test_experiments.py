@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 import yaml
 
+from audire.asr.evaluation import ASREvalConfig
 from audire.config.paths import repo_root
+from audire.experiments.figures import regenerate
 from audire.experiments.registry import (
     fail_run,
     finish_run,
@@ -25,7 +28,7 @@ REAL_CONFIGS = repo_root() / "experiments" / "configs"
 
 
 @pytest.fixture(autouse=True)
-def _isolated_experiments(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def _isolated_experiments(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """레지스트리와 아티팩트를 임시 디렉터리로 격리한다."""
     monkeypatch.setenv("AUDIRE_EXPERIMENTS_DIR", str(tmp_path / "experiments"))
     monkeypatch.setenv("AUDIRE_ARTIFACTS_DIR", str(tmp_path / "experiments" / "artifacts"))
@@ -99,6 +102,63 @@ def test_empty_registry_reads_as_an_empty_list() -> None:
     assert load_runs() == []
 
 
+def test_figures_support_mixed_evaluation_and_sensitivity_runs() -> None:
+    """`figures --all`은 서로 다른 요약 스키마를 함께 처리해야 한다."""
+    evaluation = new_run("evaluation", {}, [1])
+    save_artifact(
+        evaluation,
+        "summary.json",
+        {
+            "experiment": "evaluation",
+            "n_seeds": 1,
+            "arms": [],
+            "contrasts": [],
+            "caption_frontier": [],
+            "threshold_comparison": {},
+        },
+    )
+    finish_run(evaluation, {})
+
+    sensitivity = new_run("sensitivity", {}, [1, 2, 3])
+    save_artifact(
+        sensitivity,
+        "summary.json",
+        {
+            "experiment": "sensitivity",
+            "is_synthetic": True,
+            "n_cells": 3,
+            "grid": [
+                {
+                    "dirichlet_concentration": concentration,
+                    "n_calibration_trials": calibration,
+                    "arm": "clinical_plus_confusion",
+                    "n_seeds": 3,
+                    "pr_auc_mean": 0.6,
+                    "misheard_recall_mean": 0.3,
+                    "worst_listener_recall_mean": 0.1,
+                    "recall_over_word_length_mean": gain,
+                    "n_seeds_beating_word_length": wins,
+                }
+                for concentration, calibration, gain, wins in (
+                    (5.0, 25, 0.02, 3),
+                    (5.0, 100, 0.03, 3),
+                    (80.0, 25, -0.01, 0),
+                    (80.0, 100, 0.00, 1),
+                )
+            ],
+        },
+    )
+    finish_run(sensitivity, {})
+
+    paths = regenerate(all_runs=True)
+
+    assert {path.name for path in paths} == {
+        "table_sensitivity.csv",
+        "fig_sensitivity_clinical_plus_confusion.png",
+    }
+    assert all(path.exists() and path.stat().st_size > 0 for path in paths)
+
+
 # =========================================================== 설정
 
 
@@ -109,6 +169,9 @@ def test_shipped_experiment_configs_parse() -> None:
         assert cfg.simulation.seeds
         assert cfg.arms and cfg.models
         assert cfg.n_bootstrap >= 0
+    asr_cfg = ASREvalConfig.load(REAL_CONFIGS / "asr_eval.yaml")
+    assert asr_cfg.n_utterances == 10
+    assert len(asr_cfg.model_revision) == 40
 
 
 def test_main_config_declares_every_required_comparison() -> None:

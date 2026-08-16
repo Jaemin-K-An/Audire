@@ -393,6 +393,61 @@ def test_score_transcript_without_a_policy_leaves_decisions_unapplied(
 # =========================================================== real backend
 
 
+def test_default_asr_model_revision_is_pinned_and_forwarded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A moving Hugging Face branch must never determine production weights."""
+    import sys
+    from types import SimpleNamespace
+
+    from audire.asr.whisper_backend import DEFAULT_MODEL_REVISION
+
+    received: dict[str, object] = {}
+
+    def fake_model(model_id: str, **kwargs: object) -> object:
+        received.update(model_id=model_id, **kwargs)
+        return object()
+
+    monkeypatch.setitem(sys.modules, "faster_whisper", SimpleNamespace(WhisperModel=fake_model))
+    backend = FasterWhisperBackend(download_root=tmp_path)
+
+    backend._load()
+
+    assert len(DEFAULT_MODEL_REVISION) == 40
+    assert received["revision"] == DEFAULT_MODEL_REVISION
+    assert backend.describe()["model_revision"] == DEFAULT_MODEL_REVISION
+
+
+def _require_real_asr() -> None:
+    """Keep model downloads and external-data tests explicit in the default suite."""
+    import os
+
+    if os.environ.get("AUDIRE_RUN_REAL_ASR") != "1":
+        pytest.skip("set AUDIRE_RUN_REAL_ASR=1 to run real model inference")
+
+
+@pytest.fixture(scope="module")
+def real_korean_wav(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    _require_real_asr()
+    sf = pytest.importorskip("soundfile")
+    from audire.data.zeroth import load_zeroth_utterances
+
+    try:
+        utterance = load_zeroth_utterances(limit=1, with_audio=True)[0]
+    except FileNotFoundError as exc:
+        pytest.skip(str(exc))
+    assert utterance.audio is not None
+    path = tmp_path_factory.mktemp("real-asr") / "zeroth_ko.wav"
+    sf.write(path, utterance.audio, utterance.sample_rate)
+    return path
+
+
+@pytest.fixture(scope="module")
+def real_backend() -> FasterWhisperBackend:
+    _require_real_asr()
+    return FasterWhisperBackend()
+
+
 @pytest.mark.asr
 @pytest.mark.slow
 def test_faster_whisper_backend_reports_availability_honestly(media: Path) -> None:
@@ -407,3 +462,70 @@ def test_faster_whisper_backend_reports_availability_honestly(media: Path) -> No
         pytest.skip("faster-whisper is not installed; the availability path was verified")
     assert b.describe()["backend"] == "faster-whisper"
     assert b.describe()["decode_options"]["temperature"] == 0.0
+
+
+@pytest.mark.asr
+@pytest.mark.data
+@pytest.mark.slow
+def test_faster_whisper_transcribes_pinned_korean_audio_with_word_timestamps(
+    real_backend: FasterWhisperBackend, real_korean_wav: Path
+) -> None:
+    """Exercise installed code, downloaded weights and pinned Korean audio together."""
+    from audire.asr.whisper_backend import DEFAULT_MODEL_REVISION
+
+    transcript = real_backend.transcribe(real_korean_wav)
+
+    assert transcript.backend == "faster-whisper"
+    assert transcript.model_id == "small"
+    assert transcript.language == "ko"
+    assert transcript.duration_s > 0
+    assert transcript.tokens
+    assert transcript.hangul_tokens
+    assert transcript.timing_problems() == []
+    assert all(token.end_s >= token.start_s >= 0 for token in transcript.tokens)
+    assert all(
+        token.confidence is None or 0 <= token.confidence <= 1 for token in transcript.tokens
+    )
+    assert transcript.provenance["library_version"] == "1.2.1"
+    assert transcript.provenance["model_revision"] == DEFAULT_MODEL_REVISION
+
+
+@pytest.mark.asr
+@pytest.mark.data
+@pytest.mark.slow
+@pytest.mark.parametrize(("suffix", "codec"), [("mp3", "libmp3lame"), ("mp4", "aac")])
+def test_faster_whisper_accepts_compressed_media(
+    suffix: str,
+    codec: str,
+    real_backend: FasterWhisperBackend,
+    real_korean_wav: Path,
+    tmp_path: Path,
+) -> None:
+    """The production backend must decode both advertised upload formats."""
+    import shutil
+    import subprocess
+
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        pytest.skip("ffmpeg is required for compressed-media validation")
+    encoded = tmp_path / f"zeroth_ko.{suffix}"
+    subprocess.run(
+        [
+            ffmpeg,
+            "-y",
+            "-loglevel",
+            "error",
+            "-i",
+            str(real_korean_wav),
+            "-codec:a",
+            codec,
+            str(encoded),
+        ],
+        check=True,
+    )
+
+    transcript = real_backend.transcribe(encoded)
+
+    assert transcript.tokens
+    assert transcript.hangul_tokens
+    assert transcript.provenance["media"] == encoded.name

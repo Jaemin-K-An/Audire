@@ -1,0 +1,43 @@
+{
+  "source_id": "zeroth_korean_test",
+  "license": "CC-BY-4.0",
+  "homepage": "https://www.openslr.org/40/",
+  "revision": "1fe937899f828af822293d05e086200946088bdf",
+  "retrieved_at_utc": "2026-08-16T06:44:02.152758+00:00",
+  "local_path": "/Users/jaeminahn/Desktop/development/Audire/data/raw/zeroth_korean_test",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "f8409a3d28f569ed4160da6326ed0bc0daee35dce0beb066b8ab2bf626de7659",
+      "bytes": 6146
+    },
+    {
+      "path": "data/test-00000-of-00001.parquet",
+      "sha256": "2f6382b902622ede1bf35e5a167a9b06b0f1b8c896e1947324b8b5180fca7502",
+      "bytes": 59847930
+    }
+  ],
+  "expected": {
+    "split": "test",
+    "n_rows": 457,
+    "sample_rate_hz": 16000,
+    "n_speakers_test": 10,
+    "dataset_version": "2.0.0",
+    "parquet_file": "data/test-00000-of-00001.parquet",
+    "allow_patterns": [
+      "README.md",
+      "data/test-00000-of-00001.parquet"
+    ]
+  },
+  "checks": {
+    "parquet_present": true,
+    "n_rows": 457,
+    "backend": "huggingface_hub.snapshot_download",
+    "resolved_path": "/Users/jaeminahn/Desktop/development/Audire/data/raw/zeroth_korean_test"
+  },
+  "notes": "Permitted: ASR regression / word-timestamp testing; end-to-end selective-caption regression; reproducible noise/SNR mixing (CC BY permits derivatives with attribution). Prohibited: committing audio to this repository.",
+  "schema_version": 1,
+  "n_files": 2,
+  "total_bytes": 59854076,
+  "content_digest": "0b69ffa52399a9bebcf1715faca829ecb4faac8586214e2ba382626efe5f48c7"
+}
