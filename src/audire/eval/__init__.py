@@ -37,6 +37,7 @@ from audire.eval.splits import (
     LeakageError,
     LeakySplitter,
     assert_no_listener_leakage,
+    assert_prior_fitted_on_train_only,
     leave_one_listener_out,
     listener_folds,
 )
@@ -55,6 +56,7 @@ __all__ = [
     "LeakySplitter",
     "ThresholdComparison",
     "assert_no_listener_leakage",
+    "assert_prior_fitted_on_train_only",
     "bootstrap_metric",
     "budget_frontier",
     "cohort_matrix",

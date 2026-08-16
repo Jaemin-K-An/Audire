@@ -1,8 +1,21 @@
 """Word-level mishearing risk: features, models, calibration and explanations."""
 
+from audire.risk.advanced import (
+    ListenerRankingModel,
+    ResidualRiskModel,
+    SplineAdditiveRiskModel,
+)
 from audire.risk.calibration import CalibratedRiskModel, CalibrationMethod
+from audire.risk.confusion_features import (
+    confusion_rich_features,
+    listener_class_weakness,
+    listener_global_error,
+    n_rich_features,
+    word_class_share,
+)
 from audire.risk.features import (
     ABLATION_ARMS,
+    BLOCK_PREFIXES,
     FeatureMatrix,
     FeatureSpec,
     PhonemeRisk,
@@ -16,6 +29,13 @@ from audire.risk.features import (
     pta_features,
     word_features,
 )
+from audire.risk.hierarchical import (
+    DEFAULT_GROUP_ALPHA,
+    GroupPrior,
+    apply_group_prior,
+    fit_group_prior,
+    shrinkage_report,
+)
 from audire.risk.models import (
     MODEL_REGISTRY,
     MODEL_VERSION,
@@ -25,11 +45,15 @@ from audire.risk.models import (
     RiskModel,
     WordScorer,
     independence_scores,
+    known_models,
     make_model,
+    resolve_model,
 )
 
 __all__ = [
     "ABLATION_ARMS",
+    "BLOCK_PREFIXES",
+    "DEFAULT_GROUP_ALPHA",
     "MODEL_REGISTRY",
     "MODEL_VERSION",
     "CalibratedRiskModel",
@@ -37,20 +61,34 @@ __all__ = [
     "FeatureMatrix",
     "FeatureSpec",
     "GradientBoostedRiskModel",
+    "GroupPrior",
+    "ListenerRankingModel",
     "LogisticRiskModel",
     "PhonemeIndependenceRisk",
     "PhonemeRisk",
+    "ResidualRiskModel",
     "RiskModel",
+    "SplineAdditiveRiskModel",
     "WordContext",
     "WordScorer",
+    "apply_group_prior",
     "build_matrix",
     "clinical_features",
     "confusion_features",
+    "confusion_rich_features",
     "context_features",
+    "fit_group_prior",
     "independence_scores",
+    "known_models",
+    "listener_class_weakness",
+    "listener_global_error",
     "make_model",
+    "n_rich_features",
     "phoneme_independence_risk",
     "phoneme_risks",
     "pta_features",
+    "resolve_model",
+    "shrinkage_report",
+    "word_class_share",
     "word_features",
 ]

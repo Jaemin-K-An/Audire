@@ -40,7 +40,7 @@ from audire.profile.schema import Ear, HearingProfile
 
 FloatArray = npt.NDArray[np.float64]
 
-FeatureBlock = Literal["word", "context", "pta", "clinical", "confusion"]
+FeatureBlock = Literal["word", "context", "pta", "clinical", "confusion", "confusion_rich"]
 
 #: The preregistered ablation arms (docs/EXPERIMENT_PLAN.md E4). Each is a set of blocks.
 ABLATION_ARMS: dict[str, tuple[FeatureBlock, ...]] = {
@@ -49,10 +49,31 @@ ABLATION_ARMS: dict[str, tuple[FeatureBlock, ...]] = {
     "clinical": ("word", "context", "clinical"),
     "confusion_only": ("word", "context", "confusion"),
     "clinical_plus_confusion": ("word", "context", "clinical", "confusion"),
+    # Phase D17. Additive to the original block so the old arm stays comparable.
+    "confusion_rich_only": ("word", "context", "confusion", "confusion_rich"),
+    "clinical_plus_confusion_rich": (
+        "word",
+        "context",
+        "clinical",
+        "confusion",
+        "confusion_rich",
+    ),
 }
 
 #: Floor value for a diagonal probability when taking logs.
 _EPS = 1e-6
+
+#: Column-name prefixes per block. The residual architecture needs to split a matrix into
+#: "general difficulty" and "this listener's particular weakness" columns, and doing that
+#: by prefix keeps the split declarative rather than a hand-maintained list.
+BLOCK_PREFIXES: dict[str, tuple[str, ...]] = {
+    "word": ("w_",),
+    "context": ("c_",),
+    "pta": ("h_",),
+    "clinical": ("h_",),
+    "confusion": ("x_",),
+    "confusion_rich": ("ix_", "w2_", "x2_"),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -357,6 +378,12 @@ class FeatureSpec:
             if confusion is None:
                 raise ValueError(f"arm {self.name!r} needs a ConfusionProfile but none was given")
             out.update(confusion_features(word, confusion))
+        if "confusion_rich" in self.blocks:
+            if confusion is None:
+                raise ValueError(f"arm {self.name!r} needs a ConfusionProfile but none was given")
+            from audire.risk.confusion_features import confusion_rich_features
+
+            out.update(confusion_rich_features(word, confusion))
         return out
 
 

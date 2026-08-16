@@ -12,7 +12,7 @@ against a split that is known to leak; it is rejected by the runner.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -57,6 +57,26 @@ def assert_no_listener_leakage(groups: StrArray, train_idx: IntArray, test_idx: 
         raise LeakageError(
             f"{len(shared)} listener(s) appear in both train and test: "
             f"{sorted(shared)[:5]}{'...' if len(shared) > 5 else ''}"
+        )
+
+
+def assert_prior_fitted_on_train_only(
+    fitted_from: Sequence[str], groups: StrArray, test_idx: IntArray
+) -> None:
+    """Raise :class:`LeakageError` if a population prior saw any held-out listener.
+
+    Listener-disjoint folds are not sufficient on their own. A group prior, a shared
+    scaler, or any other statistic estimated over the whole cohort carries the held-out
+    listeners' data into the training representation, and the resulting metrics are
+    inflated in a way no group split will catch. Whenever a fold fits such a statistic it
+    must declare who contributed, and that declaration is checked here.
+    """
+    test_listeners = set(np.asarray(groups)[test_idx].tolist())
+    leaked = sorted(test_listeners & set(fitted_from))
+    if leaked:
+        raise LeakageError(
+            f"population prior was fitted on {len(leaked)} held-out listener(s): "
+            f"{leaked[:5]}{'...' if len(leaked) > 5 else ''}"
         )
 
 

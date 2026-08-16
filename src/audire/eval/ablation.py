@@ -15,6 +15,7 @@ contrasts all come from the config.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -23,6 +24,7 @@ import numpy.typing as npt
 from sklearn.metrics import average_precision_score, brier_score_loss, roc_auc_score
 
 from audire.config.logging import get_logger
+from audire.confusion.profile import ConfusionProfile
 from audire.eval.bootstrap import (
     DEFAULT_N_BOOTSTRAP,
     Interval,
@@ -37,7 +39,11 @@ from audire.eval.metrics import (
     prevalence_baseline_metrics,
     reliability_curve,
 )
-from audire.eval.splits import assert_no_listener_leakage, listener_folds
+from audire.eval.splits import (
+    assert_no_listener_leakage,
+    assert_prior_fitted_on_train_only,
+    listener_folds,
+)
 from audire.risk.calibration import CalibratedRiskModel, CalibrationMethod
 from audire.risk.features import (
     ABLATION_ARMS,
@@ -46,6 +52,7 @@ from audire.risk.features import (
     WordContext,
     build_matrix,
 )
+from audire.risk.hierarchical import DEFAULT_GROUP_ALPHA, apply_group_prior, fit_group_prior
 from audire.risk.models import make_model
 from audire.sim.cohort import Cohort
 
@@ -142,11 +149,24 @@ class ContrastResult:
 # --------------------------------------------------------------------------- matrix building
 
 
-def cohort_matrix(cohort: Cohort, spec: FeatureSpec) -> FeatureMatrix:
-    """Build the design matrix and labels for a whole cohort under one arm."""
+def cohort_matrix(
+    cohort: Cohort,
+    spec: FeatureSpec,
+    *,
+    profiles: Mapping[str, ConfusionProfile] | None = None,
+) -> FeatureMatrix:
+    """Build the design matrix and labels for a whole cohort under one arm.
+
+    ``profiles`` replaces each listener's confusion profile by listener id. It exists for
+    fold-safe hierarchical shrinkage: the caller passes profiles shrunk toward a prior
+    fitted on that fold's training listeners only. Row order does not depend on it, so
+    matrices built with different profiles remain row-aligned and paired contrasts stay
+    valid.
+    """
     rows = []
     labels: list[int] = []
     for record in cohort.records:
+        confusion = record.estimated_confusion if profiles is None else profiles[record.listener_id]
         for trial in record.word_trials:
             rows.append(
                 (
@@ -154,7 +174,7 @@ def cohort_matrix(cohort: Cohort, spec: FeatureSpec) -> FeatureMatrix:
                     trial.word,
                     WordContext(snr_db=trial.snr_db, speaker=trial.speaker),
                     record.hearing,
-                    record.estimated_confusion,
+                    confusion,
                 )
             )
             labels.append(int(trial.misheard))
@@ -192,8 +212,17 @@ def evaluate_arm(
     ece_bins: int = DEFAULT_ECE_BINS,
     threshold: float = 0.5,
     model_kwargs: dict[str, Any] | None = None,
+    group_shrinkage: bool = False,
+    group_alpha: float = DEFAULT_GROUP_ALPHA,
 ) -> ArmResult:
-    """Run listener-level cross-validation for one ``(arm, model)`` combination."""
+    """Run listener-level cross-validation for one ``(arm, model)`` combination.
+
+    ``group_shrinkage`` enables Phase-D hierarchical shrinkage of the listener confusion
+    profiles toward a population prior. The prior is **refitted inside every fold from the
+    training listeners only**, which is why the design matrix is rebuilt per fold in that
+    mode: a prior fitted once over the whole cohort would carry held-out listeners'
+    responses into the training representation and inflate every metric reported here.
+    """
     spec = FeatureSpec.arm(arm, speakers=tuple(sorted({*cohort.config.speakers, "unknown"})))
     matrix = cohort_matrix(cohort, spec)
     assert matrix.y is not None  # build_matrix was given labels
@@ -203,11 +232,32 @@ def evaluate_arm(
     oof = np.full(matrix.y.shape, np.nan, dtype=np.float64)
     description: dict[str, Any] = {}
     fold_sizes: list[tuple[int, int]] = []
+    shrinkage_log: list[dict[str, Any]] = []
 
     for fold in folds:
         # Re-assert on every fold: the guard is cheap and this is the failure mode that
         # would silently inflate every number in the report.
         assert_no_listener_leakage(matrix.groups, fold.train_idx, fold.test_idx)
+
+        fold_matrix = matrix
+        if group_shrinkage:
+            train_ids = set(fold.train_listeners)
+            prior = fit_group_prior(
+                [r.estimated_confusion for r in cohort.records if r.listener_id in train_ids]
+            )
+            # The prior itself must be provably free of held-out listeners; the group split
+            # alone does not establish that.
+            assert_prior_fitted_on_train_only(prior.fitted_from, matrix.groups, fold.test_idx)
+            # Every listener is shrunk toward the *same*, training-only prior. A held-out
+            # listener keeps their own counts and gains no information about themselves.
+            shrunk = {
+                r.listener_id: apply_group_prior(r.estimated_confusion, prior, alpha=group_alpha)
+                for r in cohort.records
+            }
+            fold_matrix = cohort_matrix(cohort, spec, profiles=shrunk)
+            if not np.array_equal(fold_matrix.groups, matrix.groups):
+                raise RuntimeError("shrunk matrix is not row-aligned with the reference matrix")
+            shrinkage_log.append({"fold": fold.index, "alpha": group_alpha, **prior.describe()})
 
         base = make_model(model_name, **(model_kwargs or {}))
         model = (
@@ -215,10 +265,13 @@ def evaluate_arm(
             if calibration == "none"
             else CalibratedRiskModel(base=base, method=calibration, seed=seed)
         )
-        model.fit(_subset(matrix, fold.train_idx))
-        oof[fold.test_idx] = model.predict_proba(_subset(matrix, fold.test_idx))
+        model.fit(_subset(fold_matrix, fold.train_idx))
+        oof[fold.test_idx] = model.predict_proba(_subset(fold_matrix, fold.test_idx))
         description = model.describe()
         fold_sizes.append((fold.n_train, fold.n_test))
+
+    if shrinkage_log:
+        description = {**description, "group_shrinkage": shrinkage_log}
 
     if np.any(~np.isfinite(oof)):
         raise RuntimeError(

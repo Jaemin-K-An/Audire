@@ -286,14 +286,38 @@ MODEL_REGISTRY: dict[str, type[RiskModel]] = {
     "gradient_boosting": GradientBoostedRiskModel,
 }
 
+#: Phase D/E families that live in :mod:`audire.risk.advanced`. They are resolved on first
+#: use rather than imported here, because that module imports :class:`RiskModel` from this
+#: one. Registering them lazily keeps a single registry without a circular import, and
+#: :func:`known_models` still reports them so a config typo gets the full candidate list.
+_LAZY_MODELS: dict[str, str] = {
+    "residual": "ResidualRiskModel",
+    "spline_gam": "SplineAdditiveRiskModel",
+    "lambdamart": "ListenerRankingModel",
+}
+
+
+def known_models() -> list[str]:
+    """Every model name an experiment config may name, eager and lazy alike."""
+    return sorted(set(MODEL_REGISTRY) | set(_LAZY_MODELS))
+
+
+def resolve_model(name: str) -> type[RiskModel]:
+    """Look up a model family, importing the advanced module only if it is needed."""
+    if name in MODEL_REGISTRY:
+        return MODEL_REGISTRY[name]
+    if name in _LAZY_MODELS:
+        from audire.risk import advanced
+
+        cls: type[RiskModel] = getattr(advanced, _LAZY_MODELS[name])
+        MODEL_REGISTRY[name] = cls
+        return cls
+    raise KeyError(f"unknown model {name!r}; known: {known_models()}")
+
 
 def make_model(name: str, **kwargs: Any) -> RiskModel:
     """Instantiate a registered model family."""
-    try:
-        cls = MODEL_REGISTRY[name]
-    except KeyError as exc:
-        raise KeyError(f"unknown model {name!r}; known: {sorted(MODEL_REGISTRY)}") from exc
-    return cls(**kwargs)
+    return resolve_model(name)(**kwargs)
 
 
 # --------------------------------------------------------------------------- scoring helper
@@ -370,5 +394,7 @@ __all__ = [
     "RiskModel",
     "WordScorer",
     "independence_scores",
+    "known_models",
     "make_model",
+    "resolve_model",
 ]
