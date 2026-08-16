@@ -313,7 +313,12 @@ def create_app(
                 ),
             )
         stored = services.store.load(listener_id)
-        problems = check_ready(services.scorer, stored.hearing, stored.confusion)
+        # `listener_id` 를 넘겨 신원 불변식을 이 계층에서 국소적으로 강제한다.
+        # 넘기지 않아도 caption_media -> score_transcript 가 결국 잡아 409 가 되지만,
+        # 그때는 이 사전 검사가 실제보다 강해 보이는 채로 남고 방어가 우연에 의존한다.
+        problems = check_ready(
+            services.scorer, stored.hearing, stored.confusion, listener_id=listener_id
+        )
         if problems:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="; ".join(problems))
 
