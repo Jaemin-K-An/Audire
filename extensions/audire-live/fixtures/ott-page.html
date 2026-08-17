@@ -77,6 +77,11 @@
       <p class="harness-state" id="fixture-state">준비됨</p>
     </section>
 
-    <script type="module" src="ott-page.js"></script>
+    <!--
+      모듈이 아니라 평범한 스크립트입니다. `type="module"` 은 `file://` 에서 CORS 로
+      막혀서, 파일을 직접 열면 조작기가 통째로 죽습니다. 이 파일은 import 가 없으므로
+      모듈일 이유가 없고, 이렇게 두면 로컬 서버와 파일 열기 양쪽에서 동작합니다.
+    -->
+    <script src="ott-page.js"></script>
   </body>
 </html>

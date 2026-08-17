@@ -64,6 +64,19 @@ test('출처가 다르면 같은 문장도 다른 지문이다', () => {
   assert.notEqual(cueFingerprint(a), cueFingerprint(b));
 });
 
+test('출처와 문장의 경계가 뭉개지지 않는다', () => {
+  // 구분자가 공백이면 이 둘이 같은 지문이 되어, 한쪽 자막이 다른 쪽의 중복으로 묻힙니다.
+  const a = { source: 'a', text: 'b c' };
+  const b = { source: 'a b', text: 'c' };
+  assert.notEqual(cueFingerprint(a), cueFingerprint(b));
+});
+
+test('지문은 관측 시각을 담지 않는다', () => {
+  // 시각이 섞이면 모든 읽기가 새 큐가 되어 중복 억제가 통째로 무력해집니다.
+  const at = (observedAtMs) => cueFingerprint({ source: 'fixture', text: '오늘', observedAtMs });
+  assert.equal(at(1), at(999999));
+});
+
 test('필수 항목이 빠진 어댑터는 등록에서 거절된다', () => {
   for (const missing of ['id', 'matches', 'locateRoot', 'readCue', 'lastInspected']) {
     const adapter = fakeAdapter();

@@ -14,26 +14,57 @@
   읽습니다.
 - 자막을 저장하지 않습니다. 로컬 서버도 자막 내용을 로그에 남기지 않습니다.
 
-## 현재 단계 (Phase 6 — 스켈레톤)
+## 현재 단계 (Phase 7 — 자막 취득 계약)
 
-지금 있는 것은 **뼈대와 그 뼈대가 지켜야 할 규칙의 시험**입니다. 아직 어떤 사이트의 자막도
-읽지 않습니다 — 콘텐츠 스크립트가 없고, 등록된 어댑터도 없습니다.
+**실제 사이트의 자막은 아직 읽지 않습니다.** 실제 사이트용 콘텐츠 스크립트가 없고, 등록된
+실사이트 어댑터도 없으며, 사이트 호스트 권한도 없습니다.
+
+지금 증명된 것은 이 질문 하나입니다: *"어댑터가 이 DOM 노드를 자막이라고 지목했을 때,
+AUDIRE 가 그것을 결정적으로, 중복 없이, DOM 객체를 흘리지 않고, 엉뚱한 텍스트를 조용히
+읽지 않고 관찰할 수 있는가?"*
 
 ```
 manifest.json          MV3 선언. 호스트 권한은 로컬 서버뿐입니다.
 src/
   background.js        서비스 워커. 확장의 유일한 네트워크 출구.
   messages.js          내부 메시지 어휘 (부작용 없음).
+  states.js            페이지 쪽 상태. 서버 쪽 LiveState 와 분리되어 있습니다.
   settings.js          설정과 페어링 토큰 보관소. 기본값은 꺼짐.
   bridge/audireClient.js   로컬 API 클라이언트. 큐 순서 판정이 여기 있습니다.
-  adapters/types.js    사이트 어댑터 계약과 자막 텍스트 읽기 규칙.
-  adapters/registry.js 어댑터 등록과 선택. 맞는 것이 없으면 null.
+  adapters/types.js    큐·사각형의 전선 계약과 자막 텍스트 읽기 규칙.
+  adapters/registry.js 어댑터 등록과 선택. 맞는 것이 없으면 명시적 상태.
+  adapters/localFixture.js  계약의 참조 구현. 저장소 안의 픽스처 페이지만 읽습니다.
+  observer/subtitleObserver.js  논리적 자막 하나를 한 번만 내보냅니다.
   popup/               연결·프로파일·자막량 UI.
+fixtures/ott-page.html 결정적 재현용 가짜 재생 페이지.
 tests/                 위 규칙들의 시험. 의존성 없이 `node --test` 로 돕니다.
 ```
 
-들어올 자리만 만들어 둔 것: `src/observer/`(MutationObserver), `src/renderer/`(동반 자막
-표시), `fixtures/`(로컬 재현용 자막 페이지).
+들어올 자리만 만들어 둔 것: `src/renderer/`(동반 자막 표시), 실사이트 어댑터.
+
+### 큐는 DOM 객체가 아닙니다
+
+큐는 콘텐츠 스크립트 → 서비스 워커 → 로컬 서버로 건너갑니다.
+
+```js
+SubtitleCue  { source, text, observedAtMs, boundingRect?, language? }
+CaptionRect  { x, y, width, height, top, right, bottom, left }   // 전부 유한수
+```
+
+`DOMRect` 는 여기 들어올 수 없습니다. 좌표 여덟 개가 프로토타입의 접근자여서
+`{...rect}` 가 `{}` 가 되기 때문입니다. `toJSON` 이 있어 직렬화 검사로는 걸러지지 않으므로,
+검사는 속성 서술자를 봅니다.
+
+### 픽스처 페이지 열기
+
+```bash
+python3 -m http.server 8931 --directory extensions/audire-live
+```
+
+그리고 <http://localhost:8931/fixtures/ott-page.html> 을 엽니다. 버튼 여덟 개가 시나리오
+A–H(자막 없음 / 단순 / 중첩 span / 여러 단어 / 같은 문장 20회 변경 / 교체 / 제거 /
+뿌리 재삽입)를 만듭니다. Phase 11 의 브라우저 E2E 는 `window.audireFixture` 를 직접
+부릅니다.
 
 ## 실행
 
@@ -64,10 +95,16 @@ npm test
 | `background.test.js` | 페어링 토큰이 응답에 실려 콘텐츠 스크립트까지 내려가는 것. 꺼짐 상태에서 자막이 서버로 나가는 것. 원격 주소가 설정에 들어가는 것 |
 | `bridge.test.js` | 오래된 큐 응답이 새 자막을 덮어써 화면이 과거로 되돌아가는 것. 실패 사유가 "안 됨" 하나로 뭉개지는 것 |
 | `adapters.test.js` | 중첩 span 을 공백으로 이어 "안녕"이 "안 녕"이 되는 것. 맞는 어댑터가 없을 때 비슷한 요소를 읽고 성공한 척하는 것 |
+| `cue-contract.test.js` | DOM 객체가 큐에 실려 경계를 넘는 것. 전개하면 좌표가 사라지는 사각형 |
+| `localFixtureAdapter.test.js` | 뿌리를 놓쳤을 때 페이지의 다른 한국어를 자막으로 읽는 것. 개발용 어댑터가 실제 시청 페이지에 붙는 것 |
+| `subtitleObserver.test.js` | 자막 하나가 수십 번의 추론 요청이 되는 것. 사라짐이 빈 큐로 나가는 것. 뿌리가 사라진 뒤 조용히 죽는 것 |
+| `source-hygiene.test.js` | 보이지 않는 제어문자가 원본에 들어오는 것 (실제로 한 번 일어났습니다) |
 
-이 시험들은 **실제로 깨지는지** 확인했습니다. 토큰 유출·꺼짐 가드 제거·순서 판정 제거·
-전 사이트 권한·루프백 검사 제거·NFC 정규화 제거의 6개 변형을 넣었을 때 각각 해당 시험이
-실패했습니다.
+이 시험들은 **실제로 깨지는지** 확인했습니다. Phase 6 에서 6개, Phase 7 에서 8개의 변형을
+주입해 각각 해당 시험이 실패하는 것을 보았습니다.
+
+Phase 7 의 결론은 **실제 브라우저에서도 다시 확인했습니다.** 로컬 서버로 픽스처를 띄우고
+진짜 `MutationObserver` 로 같은 순서를 돌린 결과가 Node 의 손수 만든 DOM 과 동일했습니다.
 
 ## 권한
 
