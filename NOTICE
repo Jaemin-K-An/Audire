@@ -1,0 +1,42 @@
+AUDIRE — Personalized Prediction of Korean Word Misrecognition for Selective Captioning
+Copyright 2026 AUDIRE contributors
+
+This product includes software developed by the AUDIRE contributors.
+
+------------------------------------------------------------------------------
+SCOPE OF THE APACHE LICENSE
+------------------------------------------------------------------------------
+
+The Apache License 2.0 in the LICENSE file applies to the SOURCE CODE in this
+repository only. It does NOT apply to third-party datasets, audio, or model
+weights, none of which are redistributed here.
+
+Data sources are declared in data/sources.yaml with their own licenses, and the
+acquisition terms and per-file checksums are recorded in docs/DATA_REGISTRY.md
+and data/manifests/. Notable terms that are NOT Apache-2.0:
+
+  * Korean monosyllabic speech perception corpus (726 utterances)
+      License: CC BY-NC-ND 4.0
+      No derivatives may be redistributed, and the creator must be notified of
+      the intended use and scope before the corpus is used. This repository
+      therefore ships NO audio from this corpus; `make data-primary` fetches it
+      locally only, and refuses to run unless the notification step has been
+      acknowledged.
+
+  * Zeroth-Korean (ASR evaluation split)
+      See data/sources.yaml for the pinned revision and license.
+
+Anyone redistributing this repository, or any artifact derived from it, is
+responsible for verifying that they comply with each data source's own terms.
+The license fields in data/sources.yaml were verified against each source's live
+API on 2026-08-16; they are machine-checked at load time, not prose.
+
+------------------------------------------------------------------------------
+NOT A MEDICAL DEVICE
+------------------------------------------------------------------------------
+
+AUDIRE is a research system. It is not a medical device, it is not validated for
+clinical use, and its outputs must not be used to diagnose, treat, or make
+clinical decisions about hearing loss. All results currently recorded in
+docs/RESULTS.md were produced on SYNTHETIC listener cohorts and are not clinical
+evidence.

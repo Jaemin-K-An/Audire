@@ -67,8 +67,8 @@ format: ## Apply formatting and safe lint fixes
 typecheck: ## Strict type checking
 	$(BIN)/mypy
 
-audit: ## Dependency vulnerability audit
-	$(BIN)/python -m pip install -q pip-audit && $(BIN)/pip-audit --strict || true
+audit: ## Dependency vulnerability audit (fails on any known vulnerability)
+	$(BIN)/python -m pip install -q pip-audit && $(BIN)/pip-audit --strict -r requirements.lock
 
 test: ## Full test suite with branch coverage on the core modules
 	$(PYTEST) --cov --cov-report=term-missing --cov-report=xml

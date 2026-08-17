@@ -8,7 +8,11 @@ version = "0.1.0"
 description = "Personalized prediction of Korean word misrecognition for selective captioning"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
-license = { text = "Apache-2.0" }
+# PEP 639 SPDX form. `license-files` ships the actual texts in the wheel —
+# declaring a license without shipping it leaves anyone who installs the
+# package unable to read the terms they are bound by.
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Project AUDIRE" }]
 keywords = ["audiology", "korean", "speech-perception", "captioning", "hearing-loss"]
 classifiers = [

@@ -18,6 +18,7 @@ interchangeable with it. See docs/DECISIONS.md ADR-0005.
 
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -151,6 +152,27 @@ def _first_hangul_syllable(text: str) -> tuple[str | None, int]:
     return (found[0] if found else None), len(found)
 
 
+def to_nfc(text: str) -> str:
+    """Normalise Hangul to precomposed (NFC) form.
+
+    Korean has two Unicode spellings of the same word: precomposed syllables
+    (``각`` = U+AC00 block) and decomposed conjoining jamo (``ᄀ`` + ``ᅡ`` + ``ᆨ``). They
+    look identical and compare unequal. macOS produces the decomposed form in filenames
+    and through several copy/paste and IME paths, so decomposed text arrives in practice
+    rather than hypothetically.
+
+    Without this normalisation a **correct** answer typed in NFD was classified as
+    ``NON_HANGUL`` and scored incorrect, because ``is_hangul_syllable`` matches only the
+    precomposed block. Every trial from such a listener would be discarded as unusable and
+    their confusion profile would be empty — a silent, listener-specific data loss that no
+    aggregate check would catch.
+
+    Normalisation happens at the parsing boundary, and the listener's untouched input is
+    still recorded in :attr:`ParsedTrial.raw_response`.
+    """
+    return unicodedata.normalize("NFC", text)
+
+
 def parse_response(target: str, response: str) -> ParsedTrial:
     """Score one calibration trial.
 
@@ -174,11 +196,14 @@ def parse_response(target: str, response: str) -> ParsedTrial:
         If ``target`` is not a single modern Hangul syllable. Stimuli are curated, so a
         malformed target is a programming error rather than a listener behaviour.
     """
+    # Normalise before every Hangul test. NFD input is common on macOS and would
+    # otherwise be scored as a non-Hangul, incorrect response even when it is correct.
+    target = to_nfc(target)
     if not is_hangul_syllable(target):
         raise ValueError(f"calibration target must be one Hangul syllable, got {target!r}")
 
     tgt = decompose_syllable(target)
-    stripped = response.strip()
+    stripped = to_nfc(response.strip())
 
     if stripped in DECLINE_TOKENS:
         quality = ResponseQuality.BLANK

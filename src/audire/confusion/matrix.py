@@ -284,6 +284,11 @@ class ConfusionMatrix:
         Each entry is ``(perceived_label, smoothed_probability, raw_count)``. Used to
         explain why a word received its risk score.
         """
+        # The bound is checked before appending, not after. Checking afterwards made
+        # ``k=0`` return one row and ``k=-1`` also return one, so a caller asking for "no
+        # explanation" silently received an explanation anyway.
+        if k <= 0:
+            return []
         r = self._row(target)
         probs = self.probabilities()[r]
         order = np.argsort(-probs)

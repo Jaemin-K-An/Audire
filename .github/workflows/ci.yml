@@ -65,9 +65,13 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install --upgrade pip pip-audit
-      - run: python -m pip install -e ".[api,data]"
-      - name: Audit installed dependencies
-        run: pip-audit --strict --ignore-vuln GHSA-placeholder || true
+      # Audit the pinned lockfile, not the installed environment. `--strict` on the
+      # environment fails on the local editable `audire` package ("not found on PyPI"),
+      # which is a configuration problem, not a finding — and the `|| true` that used to
+      # paper over it also swallowed real vulnerabilities, so this job reported green
+      # unconditionally. Auditing the lockfile lets the gate actually gate.
+      - name: Audit pinned dependencies
+        run: pip-audit --strict -r requirements.lock
 
   smoke:
     name: CPU end-to-end smoke

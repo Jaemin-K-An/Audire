@@ -32,7 +32,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from audire.config.paths import private_dir
+from audire.config.paths import private_dir, repo_root
 from audire.data.sources import SourceRegistryError, load_registry, normalise_license
 from audire.profile import (
     Audiogram,
@@ -302,3 +302,60 @@ def test_nd_detection_does_not_false_positive_on_words_containing_nd() -> None:
         verified_at="2026-08-16",
     )
     assert src.redistribution_allowed is True
+
+
+# ------------------------------------------------------- 라이선스와 보안 게이트 (§9 정리)
+
+
+def test_license_text_is_present_and_matches_the_declared_spdx_id():
+    """선언만 하고 텍스트를 넣지 않으면 설치한 사람이 조건을 확인할 수 없습니다."""
+    import tomllib
+
+    root = repo_root()
+    license_text = (root / "LICENSE").read_text(encoding="utf-8")
+    assert "Apache License" in license_text
+    assert "Version 2.0" in license_text
+
+    declared = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    assert declared["project"]["license"] == "Apache-2.0"
+    # 텍스트가 배포물에 실제로 실려야 합니다.
+    assert set(declared["project"]["license-files"]) == {"LICENSE", "NOTICE"}
+
+
+def test_notice_scopes_the_code_license_away_from_the_data():
+    """저장소가 Apache 코드와 비-Apache 데이터를 섞으므로 경계가 명시되어야 합니다."""
+    notice = (repo_root() / "NOTICE").read_text(encoding="utf-8")
+    assert "SOURCE CODE" in notice
+    # ND 코퍼스의 재배포 금지와 통지 의무가 적혀 있어야 합니다.
+    assert "CC BY-NC-ND 4.0" in notice
+    assert "No derivatives" in notice
+    # 의료기기가 아니라는 진술은 어느 배포 경로에서도 빠지면 안 됩니다.
+    assert "not a medical device" in notice.lower()
+    assert "SYNTHETIC" in notice
+
+
+def test_security_audit_gate_cannot_pass_unconditionally():
+    """회귀 테스트.
+
+    CI 의 `security` 잡과 `make audit` 이 `|| true` 로 끝나고 있었습니다. 이름은 "dependency
+    audit" 인데 결과와 무관하게 항상 초록이었고, 실제 취약점도 함께 삼켰습니다. `--strict`
+    가 로컬 editable 패키지 때문에 실패하던 설정 문제를 덮으려던 것이지만, 덮인 것은 그것만이
+    아니었습니다.
+    """
+    root = repo_root()
+    ci = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    makefile = (root / "Makefile").read_text(encoding="utf-8")
+
+    # pip-audit 을 **실행하는** 줄만 봅니다. 설치하는 줄(`pip install ... pip-audit`)까지
+    # 포함하면 검사가 무관한 줄에서 실패해 신호가 죽습니다.
+    audit_lines = [
+        line
+        for text in (ci, makefile)
+        for line in text.splitlines()
+        if "pip-audit --" in line and not line.lstrip().startswith("#")
+    ]
+    assert audit_lines, "감사 명령을 찾지 못했습니다"
+    for line in audit_lines:
+        assert "|| true" not in line, f"게이트가 무조건 통과합니다: {line.strip()}"
+        assert "requirements.lock" in line, f"고정된 락파일을 감사해야 합니다: {line.strip()}"
+        assert "GHSA-placeholder" not in line, "자리표시자 예외는 남겨두면 안 됩니다"
