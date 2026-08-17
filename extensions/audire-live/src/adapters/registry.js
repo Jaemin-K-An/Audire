@@ -6,6 +6,7 @@
  * 것처럼 보입니다.
  */
 
+import { PageState } from '../states.js';
 import { assertAdapterContract } from './types.js';
 
 /** @type {import('./types.js').SubtitleAdapter[]} */
@@ -35,11 +36,16 @@ export function listAdapters() {
 }
 
 /**
- * 이 위치에 맞는 어댑터. 없으면 null 이며, 호출자는 그것을 "지원하지 않음" 상태로
- * 사용자에게 보여야 합니다.
+ * 이 위치에 맞는 어댑터를 고릅니다.
  *
- * @param {Location} location
- * @returns {import('./types.js').SubtitleAdapter | null}
+ * 결과는 어댑터가 아니라 **상태**입니다. `null` 을 돌려주면 호출자가 그것을 "아직 안
+ * 읽었음"·"자막 없음"·"지원 안 함" 중 무엇으로든 해석할 수 있고, 그 셋은 사용자에게
+ * 전혀 다른 뜻입니다.
+ *
+ * 등록 순서가 곧 우선순위입니다. 먼저 등록된 어댑터가 먼저 평가됩니다.
+ *
+ * @param {Location | object | null} location
+ * @returns {{state: string, adapter: import('./types.js').SubtitleAdapter | null}}
  */
 export function selectAdapter(location) {
   for (const adapter of registered) {
@@ -51,7 +57,7 @@ export function selectAdapter(location) {
       // 조용히 "맞음" 으로 취급하지는 않습니다.
       matched = false;
     }
-    if (matched) return adapter;
+    if (matched) return { state: PageState.OK, adapter };
   }
-  return null;
+  return { state: PageState.NO_MATCHING_ADAPTER, adapter: null };
 }

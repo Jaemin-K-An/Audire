@@ -9,7 +9,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { createLocalFixtureAdapter } from '../src/adapters/localFixture.js';
 import { listAdapters, register, reset, selectAdapter } from '../src/adapters/registry.js';
+import { PageState } from '../src/states.js';
 import {
   assertAdapterContract,
   cueFingerprint,
@@ -81,10 +83,21 @@ test('같은 id 를 두 번 등록할 수 없다', () => {
   assert.equal(listAdapters().length, 1);
 });
 
-test('맞는 어댑터가 없으면 null 이다', () => {
-  // 비슷한 어댑터로 넘어가면 자막이 아닌 페이지 요소를 읽고도 성공한 것처럼 보입니다.
+test('맞는 어댑터가 없으면 명시적인 미지원 상태다', () => {
+  // null 이면 호출자가 "아직 안 읽었음"·"자막 없음"·"지원 안 함" 중 무엇으로든 읽을 수
+  // 있고, 그 셋은 사용자에게 전혀 다른 뜻입니다.
   register(fakeAdapter({ id: 'never', matches: () => false }));
-  assert.equal(selectAdapter({ hostname: 'example.com' }), null);
+  const result = selectAdapter({ hostname: 'example.com' });
+  assert.equal(result.state, PageState.NO_MATCHING_ADAPTER);
+  assert.equal(result.adapter, null);
+});
+
+test('등록 순서가 우선순위이며 결정적이다', () => {
+  register(fakeAdapter({ id: 'first' }));
+  register(fakeAdapter({ id: 'second' }));
+  for (let i = 0; i < 5; i += 1) {
+    assert.equal(selectAdapter({ hostname: 'example.com' }).adapter.id, 'first');
+  }
 });
 
 test('어댑터 하나가 던져도 나머지가 평가된다', () => {
@@ -97,7 +110,9 @@ test('어댑터 하나가 던져도 나머지가 평가된다', () => {
     }),
   );
   register(fakeAdapter({ id: 'good', matches: (loc) => loc.hostname === 'example.com' }));
-  assert.equal(selectAdapter({ hostname: 'example.com' })?.id, 'good');
+  const result = selectAdapter({ hostname: 'example.com' });
+  assert.equal(result.state, PageState.OK);
+  assert.equal(result.adapter.id, 'good');
 });
 
 test('던진 어댑터가 일치로 취급되지 않는다', () => {
@@ -109,5 +124,15 @@ test('던진 어댑터가 일치로 취급되지 않는다', () => {
       },
     }),
   );
-  assert.equal(selectAdapter({ hostname: 'example.com' }), null);
+  assert.equal(selectAdapter({ hostname: 'example.com' }).state, PageState.NO_MATCHING_ADAPTER);
+});
+
+test('픽스처 어댑터는 등록 후에도 실제 사이트를 끌어오지 않는다', () => {
+  // 등록소를 거친 선택 경로에서도 같은 성질이 유지되어야 합니다.
+  register(createLocalFixtureAdapter({ document: null }));
+  const youtube = { protocol: 'https:', hostname: 'www.youtube.com', pathname: '/watch' };
+  assert.equal(selectAdapter(youtube).state, PageState.NO_MATCHING_ADAPTER);
+
+  const fixture = { protocol: 'file:', hostname: '', pathname: '/repo/fixtures/ott-page.html' };
+  assert.equal(selectAdapter(fixture).adapter.id, 'local-fixture');
 });

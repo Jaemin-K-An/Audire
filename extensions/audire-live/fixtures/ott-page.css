@@ -1,0 +1,118 @@
+/* 픽스처 외양. 원격 자원을 부르지 않습니다. */
+
+body {
+  margin: 0;
+  font: 14px/1.6 system-ui, -apple-system, sans-serif;
+  background: #14161b;
+  color: #e6e8ee;
+}
+
+.site-bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 16px;
+  background: #0d0f13;
+}
+
+.logo {
+  font-weight: 700;
+}
+
+.search {
+  flex: 1;
+  max-width: 320px;
+  padding: 4px 8px;
+}
+
+main {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+  gap: 24px;
+  padding: 16px;
+}
+
+.stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border-radius: 8px;
+}
+
+.stage-note {
+  color: #6c7280;
+}
+
+/* 자막 뿌리. 어댑터가 아는 유일한 노드입니다. */
+.subtitles {
+  position: absolute;
+  bottom: 8%;
+  max-width: 80%;
+  padding: 4px 10px;
+  text-align: center;
+  font-size: 20px;
+  background: rgb(0 0 0 / 65%);
+  border-radius: 4px;
+}
+
+.subtitles:empty {
+  padding: 0;
+  background: transparent;
+}
+
+.controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.title {
+  margin: 12px 0 4px;
+  font-size: 18px;
+}
+
+.description,
+.label,
+.time {
+  color: #9aa1b1;
+}
+
+.sidebar h2 {
+  font-size: 13px;
+  text-transform: uppercase;
+  color: #9aa1b1;
+}
+
+.comments {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.harness {
+  padding: 16px;
+  border-top: 1px solid #2a2e37;
+}
+
+.harness-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.harness button {
+  padding: 6px 10px;
+  border: 1px solid #3a4150;
+  border-radius: 6px;
+  background: #1d212a;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.harness-note,
+.harness-state {
+  color: #9aa1b1;
+}

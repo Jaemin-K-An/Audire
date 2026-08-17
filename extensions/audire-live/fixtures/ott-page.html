@@ -1,0 +1,82 @@
+<!doctype html>
+<!--
+  결정적 재현용 가짜 재생 페이지.
+
+  실제 OTT 를 흉내 내되, 저작물은 전혀 쓰지 않습니다. 화면에 나오는 한국어는 전부
+  이 시험을 위해 지어낸 문장입니다.
+
+  이 페이지가 존재하는 이유는 하나입니다: **어댑터가 자막이라고 지목한 노드만 읽는지**
+  를 확인하는 것. 그래서 자막이 아닌 한국어 텍스트가 페이지 곳곳에 일부러 깔려 있습니다.
+  제목, 설명, 댓글, 컨트롤 라벨 모두 자막처럼 생긴 문장입니다. 어댑터가 자막 뿌리를
+  놓쳤을 때 "비슷한 것"으로 흘러가면 이 문장들을 읽게 되고, 시험이 그것을 잡습니다.
+-->
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>AUDIRE 픽스처 — 가짜 재생 페이지</title>
+    <link rel="stylesheet" href="ott-page.css" />
+  </head>
+  <body>
+    <header class="site-bar">
+      <span class="logo">가상 스트리밍</span>
+      <input class="search" type="search" placeholder="오늘 무엇을 보시겠습니까" />
+    </header>
+
+    <main>
+      <section class="player">
+        <div class="stage" id="fixture-stage">
+          <p class="stage-note">여기는 영상이 재생되는 자리입니다</p>
+
+          <!--
+            자막 뿌리. 어댑터가 아는 유일한 노드입니다.
+            id 가 바뀌면 어댑터는 SUBTITLE_ROOT_NOT_FOUND 를 내야 하며,
+            비슷한 요소로 넘어가서는 안 됩니다.
+          -->
+          <div id="audire-fixture-subtitles" class="subtitles" aria-live="polite"></div>
+        </div>
+
+        <div class="controls">
+          <button type="button">재생</button>
+          <button type="button">일시정지</button>
+          <span class="time">00:00 / 12:34</span>
+          <span class="label">자막을 켜면 화면에 문장이 나옵니다</span>
+        </div>
+
+        <h1 class="title">지어낸 다큐멘터리 — 병원 가는 길</h1>
+        <p class="description">
+          이 설명은 자막이 아닙니다. 어제 학교에서 만난 사람과 오늘 병원에 갑니다.
+        </p>
+      </section>
+
+      <aside class="sidebar">
+        <h2>댓글</h2>
+        <ul class="comments">
+          <li>이 장면에서 나온 말이 잘 안 들렸습니다</li>
+          <li>내일 다시 보겠습니다</li>
+          <li>감기 조심하십시오</li>
+        </ul>
+      </aside>
+    </main>
+
+    <section class="harness">
+      <h2>시험 조작</h2>
+      <p class="harness-note">
+        Phase 11 의 브라우저 E2E 는 이 버튼 대신 <code>window.audireFixture</code> 를
+        직접 부릅니다. 버튼은 사람이 손으로 확인할 때 씁니다.
+      </p>
+      <div class="harness-buttons">
+        <button type="button" data-scenario="none">A. 자막 없음</button>
+        <button type="button" data-scenario="simple">B. 단순 자막</button>
+        <button type="button" data-scenario="nested">C. 중첩 span 한 단어</button>
+        <button type="button" data-scenario="multi">D. 여러 단어</button>
+        <button type="button" data-scenario="churn">E. 같은 문장, DOM 만 20번 변경</button>
+        <button type="button" data-scenario="replace">F. 다른 문장으로 교체</button>
+        <button type="button" data-scenario="clear">G. 자막 제거</button>
+        <button type="button" data-scenario="remount">H. 뿌리 제거 후 재삽입</button>
+      </div>
+      <p class="harness-state" id="fixture-state">준비됨</p>
+    </section>
+
+    <script type="module" src="ott-page.js"></script>
+  </body>
+</html>
