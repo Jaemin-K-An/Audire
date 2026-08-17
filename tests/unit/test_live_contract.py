@@ -287,3 +287,106 @@ def test_a_live_artifact_cannot_be_used_on_the_media_route():
     """
     with pytest.raises(ContractViolation, match="입력 계약 불일치"):
         assert_contract_compatible("live-caption-v1", "media-pipeline-v1")
+
+
+# ------------------------------------------------------------ 아티팩트 계약 결합
+
+
+@pytest.fixture(scope="module")
+def live_artifact(tmp_path_factory):
+    from audire.risk.artifact import fit_live_artifact
+
+    art = fit_live_artifact(_tiny_live_config(tmp_path_factory.mktemp("live")))
+    return art
+
+
+def _tiny_live_config(directory):
+    import yaml as _yaml
+
+    path = directory / "live.yaml"
+    path.write_text(
+        _yaml.safe_dump(
+            {
+                "name": "live_tiny",
+                "simulation": {
+                    "name": "c",
+                    "seeds": [1],
+                    "n_listeners": 12,
+                    "n_calibration_trials": 20,
+                    "n_word_trials": 20,
+                },
+                "arms": ["live_word_context_clinical_confusion"],
+                "models": ["logistic"],
+                "n_splits": 3,
+                "n_bootstrap": 0,
+                "contrasts": [],
+            },
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_live_artifact_declares_its_contract_and_schema(live_artifact):
+    meta = live_artifact.metadata
+    assert meta["input_contract"] == "live-caption-v1"
+    assert meta["artifact_type"] == "live_caption"
+    assert meta["feature_schema_hash"]
+    assert meta["intended_use"] == "browser_dom_live_caption_engineering_demo"
+
+
+def test_live_artifact_records_synthetic_provenance(live_artifact):
+    """합성 학습을 사람 효능 근거로 읽지 않도록 아티팩트 자체가 못박습니다."""
+    meta = live_artifact.metadata
+    assert meta["training_source"] == "synthetic simulation"
+    assert meta["human_efficacy_evidence"] is False
+    assert meta["clinical_efficacy_claim"] is False
+    assert "simulator_version" in meta
+
+
+def test_live_artifact_has_no_acoustic_columns(live_artifact):
+    names = live_artifact.scorer.spec_feature_names()
+    assert names
+    LIVE_CAPTION_V1.validate_columns(names)
+
+
+def test_live_artifact_is_rejected_by_the_media_loader(live_artifact, tmp_path):
+    from audire.risk.artifact import DeploymentArtifact
+
+    path, _ = live_artifact.save(tmp_path / "live.joblib")
+    DeploymentArtifact.load(path, expect_contract="live-caption-v1")
+    with pytest.raises(ContractViolation, match="입력 계약 불일치"):
+        DeploymentArtifact.load(path, expect_contract="media-pipeline-v1")
+
+
+def test_a_schema_hash_mismatch_is_rejected(live_artifact):
+    """열 이름이나 순서가 달라지면 계수를 그대로 쓸 수 없습니다."""
+    import dataclasses
+
+    from audire.risk.artifact import ModelArtifactError
+
+    tampered = dataclasses.replace(
+        live_artifact,
+        metadata={**live_artifact.metadata, "feature_schema_hash": "0" * 64},
+    )
+    with pytest.raises(ModelArtifactError, match="feature schema mismatch"):
+        tampered.validate()
+
+
+def test_an_artifact_without_a_contract_is_rejected(live_artifact):
+    import dataclasses
+
+    from audire.risk.artifact import ModelArtifactError
+
+    meta = {k: v for k, v in live_artifact.metadata.items() if k != "input_contract"}
+    with pytest.raises(ModelArtifactError, match="input contract"):
+        dataclasses.replace(live_artifact, metadata=meta).validate()
+
+
+def test_fit_live_artifact_refuses_an_arm_with_acoustic_context(tmp_path_factory):
+    from audire.risk.artifact import fit_live_artifact
+
+    config = _tiny_live_config(tmp_path_factory.mktemp("bad"))
+    with pytest.raises(ContractViolation, match="context"):
+        fit_live_artifact(config, arm="clinical_plus_confusion")

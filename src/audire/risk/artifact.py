@@ -31,7 +31,13 @@ from audire.experiments.registry import (
     lock_hash,
 )
 from audire.experiments.runner import ExperimentConfig
-from audire.risk.features import FeatureMatrix, FeatureSpec
+from audire.live.contract import (
+    LIVE_CAPTION_V1,
+    assert_contract_compatible,
+    feature_schema_hash,
+    get_contract,
+)
+from audire.risk.features import ABLATION_ARMS, FeatureMatrix, FeatureSpec
 from audire.risk.models import MODEL_VERSION, LogisticRiskModel, WordScorer
 from audire.sim.cohort import build_cohort
 
@@ -66,6 +72,27 @@ class DeploymentArtifact:
         if "training_source" not in self.metadata:
             raise ModelArtifactError("artifact metadata does not declare its training source")
 
+        # 입력 계약과 스키마 결합. 파일이 존재한다는 이유만으로 모델을 고르면, 음향 맥락을
+        # 기대하는 모델이 그것이 없는 경로에서 조용히 돌 수 있습니다. 출력은 그럴듯하지만
+        # 학습 분포 밖입니다(ADR-0021).
+        contract_version = self.metadata.get("input_contract")
+        if contract_version is None:
+            raise ModelArtifactError(
+                "artifact metadata does not declare its input contract; "
+                "cannot decide which pipeline may use it"
+            )
+        contract = get_contract(str(contract_version))
+        names = self.scorer.spec_feature_names()
+        contract.validate_columns(names)
+
+        declared = self.metadata.get("feature_schema_hash")
+        actual = feature_schema_hash(str(contract_version), names)
+        if declared != actual:
+            raise ModelArtifactError(
+                f"feature schema mismatch: artifact={declared!r}, runtime={actual!r}. "
+                f"열 이름이나 순서가 달라졌으므로 계수를 그대로 쓸 수 없습니다."
+            )
+
     def save(self, path: Path) -> tuple[Path, Path]:
         """Write the model and a human-readable, checksummed provenance sidecar."""
         self.validate()
@@ -91,7 +118,13 @@ class DeploymentArtifact:
         return target, sidecar
 
     @classmethod
-    def load(cls, path: Path) -> Self:
+    def load(cls, path: Path, *, expect_contract: str | None = None) -> Self:
+        """아티팩트를 읽습니다.
+
+        ``expect_contract`` 를 주면 아티팩트가 선언한 계약과 대조합니다. 미디어 경로가
+        라이브 아티팩트를, 라이브 경로가 미디어 아티팩트를 집어 드는 것을 막습니다 —
+        두 경로는 볼 수 있는 정보가 다르므로 교차 사용할 수 없습니다.
+        """
         target = path.resolve()
         sidecar = target.with_suffix(target.suffix + ".json")
         if not target.exists() or not sidecar.exists():
@@ -114,6 +147,8 @@ class DeploymentArtifact:
                 f"artifact contains {type(loaded).__name__}, not DeploymentArtifact"
             )
         loaded.validate()
+        if expect_contract is not None:
+            assert_contract_compatible(str(loaded.metadata.get("input_contract")), expect_contract)
         return loaded
 
 
@@ -139,8 +174,17 @@ def fit_deployment_artifact(
     *,
     arm: str = DEFAULT_DEPLOYMENT_ARM,
     model_name: str = DEFAULT_DEPLOYMENT_MODEL,
+    contract_version: str = "media-pipeline-v1",
+    artifact_type: str = "media_pipeline",
+    intended_use: str = "asr_media_selective_caption",
 ) -> DeploymentArtifact:
-    """Fit the preselected deployment family on every seed declared by ``config_path``."""
+    """Fit the preselected deployment family on every seed declared by ``config_path``.
+
+    ``contract_version`` 이 이 아티팩트가 어느 경로에서 쓰일 수 있는지를 정합니다. 기본값은
+    음향 맥락을 보는 미디어 경로이고, 라이브 자막 아티팩트는
+    :func:`fit_live_artifact` 가 만듭니다 — 두 경로는 볼 수 있는 정보가 다르므로 아티팩트를
+    교차 사용할 수 없습니다(ADR-0021).
+    """
     cfg = ExperimentConfig.load(config_path)
     if arm not in cfg.arms:
         raise ValueError(f"deployment arm {arm!r} is not declared in {config_path}")
@@ -180,6 +224,13 @@ def fit_deployment_artifact(
         "arm": arm,
         "model": model_name,
         "model_version": MODEL_VERSION,
+        "input_contract": contract_version,
+        "feature_schema_hash": feature_schema_hash(contract_version, model.feature_names),
+        "artifact_type": artifact_type,
+        "intended_use": intended_use,
+        "simulator_version": cfg.simulation.simulator_version,
+        # 사람 청취 이득의 근거가 아님을 아티팩트 자체에 못박습니다.
+        "human_efficacy_evidence": False,
         "git_sha": git_sha(),
         "git_dirty": git_is_dirty(),
         "lock_hash": lock_hash(),
@@ -190,4 +241,36 @@ def fit_deployment_artifact(
         schema_version=ARTIFACT_SCHEMA_VERSION,
         scorer=scorer,
         metadata=metadata,
+    )
+
+
+#: Phase 4(E30)에서 선택된 라이브 arm. 근거는 docs/RESULTS.md §19 와 ADR-0021.
+DEFAULT_LIVE_ARM = "live_word_context_clinical_confusion"
+
+
+def fit_live_artifact(
+    config_path: Path,
+    *,
+    arm: str = DEFAULT_LIVE_ARM,
+) -> DeploymentArtifact:
+    """브라우저 DOM 자막 경로용 아티팩트를 적합합니다.
+
+    미디어 아티팩트를 덮어쓰지 않는 **별도 계열**입니다. 학습과 추론이 같은 정보 제약
+    아래에 있어야 하므로, 음향 맥락을 포함하지 않는 arm 으로만 적합합니다.
+
+    이 아티팩트가 유효한 정책
+    -------------------------
+    E30 은 **전역 임계값**에서 이 arm 이 normal/mild 청취자에게 사실상 자막을 주지 않는다는
+    것을 보였습니다(자막률 0.0004 / 0.0204). 따라서 소비 측은 **청취자별 임계값**을 써야
+    하며, 그 조건에서는 모든 중증도 계층이 동일한 자막률(~0.20)과 재현율을 받습니다.
+    이 제약은 ADR-0021 에 기록되어 있고 Phase 5 의 전제 조건입니다.
+    """
+    LIVE_CAPTION_V1.validate_blocks(ABLATION_ARMS[arm])
+    return fit_deployment_artifact(
+        config_path,
+        arm=arm,
+        model_name="logistic",
+        contract_version=LIVE_CAPTION_V1.version,
+        artifact_type="live_caption",
+        intended_use="browser_dom_live_caption_engineering_demo",
     )

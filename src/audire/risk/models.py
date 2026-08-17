@@ -337,6 +337,15 @@ class WordScorer:
     spec: FeatureSpec
     provenance: dict[str, Any] = field(default_factory=dict)
 
+    def spec_feature_names(self) -> tuple[str, ...]:
+        """적합된 모델이 기대하는 열 이름을 순서대로.
+
+        아티팩트를 정확한 스키마에 묶는 데 씁니다. 선형 계수가 열 순서에 묶여 있으므로
+        순서까지 포함해야 합니다.
+        """
+        names = getattr(self.model, "feature_names", ())
+        return tuple(names)
+
     def score(
         self,
         listener_id: str,
