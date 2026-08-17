@@ -1,0 +1,41 @@
+# AUDIRE E29 — Phase F 판정: 청취자 내 순위를 직접 최적화하면 나아지는가 (Simulator v1).
+#
+# E28 이 드러낸 것: 청취자별 예산에서 블록을 더할수록 Recall@20% 가 단조 감소하고,
+# V2 에서는 청취자 정보가 전혀 없는 word_context_only 가 최고였습니다. 청취자 상수 특징은
+# 청취자 **내** 순위를 바꿀 수 없고 추정 잡음만 더하기 때문입니다.
+#
+# pairwise_logistic 은 청취자 안에서 ΔX 를 만들어 그 상수 열을 구조적으로 0 으로 만듭니다.
+# 이 실험은 그 설계가 실제로 순위를 개선하는지 판정합니다.
+#
+# 지는 후보도 표에 남습니다. 참조 로지스틱은 항상 포함됩니다(ADR-0012).
+
+name: e29_ranking_v1
+description: >-
+  청취자 내 순위를 직접 최적화하는 쌍별 로지스틱 랭커와 교차적합 잔차를, 참조 로지스틱 및
+  기존 후보들과 Simulator v1 에서 비교합니다.
+
+simulation:
+  name: e29_cohort_v1
+  seeds: [101, 202, 303, 404, 505]
+  n_listeners: 80
+  n_calibration_trials: 100
+  n_word_trials: 250
+  snr_conditions_db: [20.0]
+  speakers: [male, female]
+  simulator_version: v1
+
+models:
+  - logistic
+  - pairwise_logistic
+  - cross_fitted_residual
+  - residual
+  - phoneme_independence
+
+arm: clinical_plus_confusion
+fallback_arm: clinical_plus_confusion
+calibrations: [none]
+n_splits: 5
+n_bootstrap: 0
+ece_bins: 10
+budgets: [0.10, 0.20, 0.30, 0.50]
+primary_budget: 0.20
