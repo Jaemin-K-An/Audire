@@ -216,6 +216,65 @@ test('범위를 벗어난 자막률은 거절된다', async () => {
   }
 });
 
+test('화면 식별자가 클라이언트까지 전달된다', async () => {
+  // 이것이 빠지면 모든 탭이 같은 순서 카운터를 나눠 쓰고, 한 탭의 자막이 다른 탭 때문에
+  // 버려집니다.
+  const { client, router } = build(undefined, {
+    'audire.settings': { enabled: true, profileId: 'L01' },
+  });
+  await router({
+    type: MessageType.SCORE_CUE,
+    payload: { cueId: 'c1', text: '자막', source: 'fixture', streamId: 'tab-7' },
+  });
+  assert.equal(client.seen.find((c) => c.call === 'score-cue').cue.streamId, 'tab-7');
+});
+
+test('설정이 바뀌면 탭에 알리되 값은 싣지 않는다', async () => {
+  // 방송에 설정 값을 실으면 그 값이 페이지 위에서 도는 코드로 흘러갑니다. 콘텐츠
+  // 스크립트는 다시 물어보면 됩니다.
+  const broadcasts = [];
+  const original = globalThis.chrome;
+  globalThis.chrome = {
+    tabs: {
+      query: async () => [{ id: 1 }, { id: 2 }],
+      sendMessage: async (tabId, message) => broadcasts.push({ tabId, message }),
+    },
+  };
+  try {
+    const { router } = build();
+    await router({ type: MessageType.UPDATE_SETTINGS, payload: { profileId: 'L03' } });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    assert.equal(broadcasts.length, 2);
+    assert.deepEqual(broadcasts[0].message, { type: MessageType.SETTINGS_CHANGED });
+    assert.ok(!JSON.stringify(broadcasts).includes('L03'), 'broadcast must not carry settings');
+  } finally {
+    if (original === undefined) delete globalThis.chrome;
+    else globalThis.chrome = original;
+  }
+});
+
+test('콘텐츠 스크립트가 없는 탭이 있어도 방송이 죽지 않는다', async () => {
+  const original = globalThis.chrome;
+  globalThis.chrome = {
+    tabs: {
+      query: async () => [{ id: 1 }, { id: 2 }],
+      sendMessage: async (tabId) => {
+        if (tabId === 1) throw new Error('Receiving end does not exist');
+      },
+    },
+  };
+  try {
+    const { router } = build();
+    const result = await router({ type: MessageType.UPDATE_SETTINGS, payload: { enabled: true } });
+    assert.equal(result.ok, true);
+  } finally {
+    if (original === undefined) delete globalThis.chrome;
+    else globalThis.chrome = original;
+  }
+});
+
 test('설정 저장은 나머지 값을 보존한다', async () => {
   const { router } = build();
   await router({ type: MessageType.UPDATE_SETTINGS, payload: { profileId: 'L02' } });

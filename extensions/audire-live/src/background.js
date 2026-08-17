@@ -36,6 +36,26 @@ export function createRouter(deps) {
     cached = { key: null, client: null };
   }
 
+  /**
+   * 열려 있는 탭에 "설정이 바뀌었다" 만 알립니다.
+   *
+   * `chrome.tabs.query({})` 는 `tabs` 권한 없이도 탭 id 를 줍니다(url·title 은 가려집니다).
+   * 콘텐츠 스크립트가 없는 탭으로 보낸 메시지는 수신자가 없어 실패하는데, 그것은 정상
+   * 이므로 삼킵니다.
+   */
+  async function broadcastSettingsChanged() {
+    const tabs = await globalThis.chrome?.tabs?.query?.({});
+    for (const tab of tabs ?? []) {
+      try {
+        await globalThis.chrome.tabs.sendMessage(tab.id, {
+          type: MessageType.SETTINGS_CHANGED,
+        });
+      } catch {
+        // 이 탭에는 콘텐츠 스크립트가 없습니다.
+      }
+    }
+  }
+
   async function client() {
     const { baseUrl } = await settings.load();
     const token = await settings.readToken();
@@ -104,6 +124,10 @@ export function createRouter(deps) {
         try {
           const next = await settings.update(message.payload ?? {});
           invalidateClient();
+          // 열려 있는 탭에 알립니다. 팝업에서 껐는데 탭을 새로 고쳐야 멈춘다면 그것은
+          // 꺼진 것이 아닙니다. **설정 값을 싣지 않습니다** — 콘텐츠 스크립트는 다시
+          // 물어보면 되고, 방송에 값을 실으면 그 값이 페이지 위의 코드로 흘러갑니다.
+          void broadcastSettingsChanged();
           return { ok: true, state: LiveState.OK, settings: next };
         } catch (error) {
           const detail = String(error?.message ?? error);
@@ -125,6 +149,8 @@ export function createRouter(deps) {
           cueId: message.payload?.cueId ?? '',
           text: message.payload?.text ?? '',
           source: message.payload?.source ?? 'unknown',
+          // 화면별 순서 판정. 탭이 둘일 때 서로의 자막을 stale 로 만들지 않습니다.
+          streamId: message.payload?.streamId ?? 'default',
           targetCaptionRate: current.targetCaptionRate,
         });
         return {

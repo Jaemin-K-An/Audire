@@ -115,6 +115,52 @@ test('늦게 도착한 옛 응답은 stale 로 표시된다', async () => {
   assert.equal(firstResult.stale, true, 'the older cue must be marked stale');
 });
 
+test('다른 화면의 큐가 서로를 stale 로 만들지 않는다', async () => {
+  // 서비스 워커는 클라이언트를 하나만 둡니다. 순번이 화면별이 아니면, 탭 A 의 응답이
+  // 탭 B 의 뒤에 도착했다는 이유로 A 의 자막이 버려집니다. 서로 다른 화면인데도.
+  let releaseFirst;
+  const gate = new Promise((resolve) => {
+    releaseFirst = resolve;
+  });
+  const fetchImpl = stubFetch(async (_url, _init, n) => {
+    if (n === 1) await gate;
+    return jsonResponse({ cue_id: `cue-${n}` });
+  });
+
+  const client = new AudireClient({ fetchImpl });
+  const tabA = client.scoreCue({
+    profileId: 'p',
+    cueId: 'a1',
+    text: '탭 A',
+    source: 'fixture',
+    streamId: 'tab-a',
+  });
+  await client.scoreCue({
+    profileId: 'p',
+    cueId: 'b1',
+    text: '탭 B',
+    source: 'fixture',
+    streamId: 'tab-b',
+  });
+  releaseFirst();
+
+  assert.equal((await tabA).stale, false, "tab A's cue belongs to a different screen");
+});
+
+test('화면 식별자는 서버로 나가지 않는다', async () => {
+  const fetchImpl = stubFetch(() => jsonResponse({}));
+  const client = new AudireClient({ fetchImpl });
+  await client.scoreCue({
+    profileId: 'p',
+    cueId: 'a',
+    text: '가',
+    source: 'fixture',
+    streamId: 'tab-a',
+  });
+  const body = JSON.parse(fetchImpl.calls[0].init.body);
+  assert.ok(!('streamId' in body) && !('stream_id' in body));
+});
+
 test('순서대로 도착하면 stale 이 아니다', async () => {
   const fetchImpl = stubFetch((_url, _init, n) => jsonResponse({ cue_id: `cue-${n}` }));
   const client = new AudireClient({ fetchImpl });

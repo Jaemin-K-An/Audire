@@ -15,5 +15,24 @@
   "action": {
     "default_popup": "src/popup/popup.html",
     "default_title": "AUDIRE Live"
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost/*/ott-page.html",
+        "http://127.0.0.1/*/ott-page.html"
+      ],
+      "js": ["src/content-loader.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/*.js", "src/*/*.js"],
+      "matches": [
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ]
+    }
+  ]
 }

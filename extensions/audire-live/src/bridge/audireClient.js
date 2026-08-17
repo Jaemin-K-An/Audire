@@ -34,9 +34,20 @@ export class AudireClient {
     this.baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
     this.token = options.token ?? null;
     this._fetch = options.fetchImpl ?? globalThis.fetch?.bind(globalThis);
-    // 마지막으로 **보낸** 큐의 순번. 응답이 도착했을 때 이것과 비교해 오래된 것을 버립니다.
+    // 보낸 큐의 순번. 응답이 도착했을 때 이것과 비교해 오래된 것을 버립니다.
     this._sequence = 0;
-    this._latestApplied = 0;
+    /**
+     * 화면**마다** 마지막으로 반영된 순번.
+     *
+     * 이것이 하나의 숫자였을 때 실제 결함이 있었습니다. 서비스 워커는 클라이언트를 하나만
+     * 두므로, 탭이 둘이면 두 화면의 큐가 같은 카운터를 나눠 씁니다. 탭 A 의 응답이 탭 B
+     * 의 뒤에 도착했다는 이유로 A 의 자막이 버려집니다 — 서로 다른 화면인데도.
+     *
+     * 순서는 "같은 화면 안에서" 만 뜻이 있습니다.
+     *
+     * @type {Map<string, number>}
+     */
+    this._latestApplied = new Map();
   }
 
   /** @param {string|null} token */
@@ -102,12 +113,16 @@ export class AudireClient {
   /**
    * 큐 하나를 채점합니다.
    *
-   * 반환값의 `stale` 이 true 이면 **이 응답을 화면에 반영하면 안 됩니다.** 더 새로운 큐가
-   * 이미 적용되었다는 뜻입니다.
+   * 반환값의 `stale` 이 true 이면 **이 응답을 화면에 반영하면 안 됩니다.** 같은 화면의 더
+   * 새로운 큐가 이미 적용되었다는 뜻입니다.
    *
-   * @param {{profileId: string, cueId: string, text: string, source: string, targetCaptionRate?: number}} cue
+   * `streamId` 는 화면 하나를 가리킵니다(보통 탭 하나). 탭이 둘이면 서로의 순서에 영향을
+   * 주지 않아야 합니다.
+   *
+   * @param {{profileId: string, cueId: string, text: string, source: string, streamId?: string, targetCaptionRate?: number}} cue
    */
   async scoreCue(cue) {
+    const stream = cue.streamId ?? 'default';
     const sequence = ++this._sequence;
     const result = await this._request('/api/live/score-cue', {
       method: 'POST',
@@ -116,16 +131,18 @@ export class AudireClient {
         cue_id: cue.cueId,
         text: cue.text,
         source: cue.source,
+        // streamId 는 확장 안에서만 쓰는 화면 식별자입니다. 서버로 보내지 않습니다 —
+        // 서버가 알 필요가 없고, 시청 맥락을 늘릴 이유도 없습니다.
         ...(cue.targetCaptionRate === undefined
           ? {}
           : { target_caption_rate: cue.targetCaptionRate }),
       }),
     });
 
-    if (sequence < this._latestApplied) {
-      return { ...result, stale: true, sequence };
+    if (sequence < (this._latestApplied.get(stream) ?? 0)) {
+      return { ...result, stale: true, sequence, streamId: stream };
     }
-    this._latestApplied = sequence;
-    return { ...result, stale: false, sequence };
+    this._latestApplied.set(stream, sequence);
+    return { ...result, stale: false, sequence, streamId: stream };
   }
 }

@@ -40,6 +40,41 @@ test('호스트 권한은 로컬 서버로만 나간다', () => {
   }
 });
 
+test('콘텐츠 스크립트는 저장소 안의 픽스처 페이지에만 주입된다', () => {
+  // 여기가 넓어지는 것이 이 확장에서 가장 큰 사고입니다. 콘텐츠 스크립트가 붙는 페이지는
+  // 곧 확장이 읽을 수 있는 페이지입니다. 실제 사이트는 어댑터가 생기는 단계에서, 그
+  // 사이트만 들어옵니다.
+  const scripts = manifest.content_scripts ?? [];
+  assert.ok(scripts.length > 0, 'phase 8 declares a fixture content script');
+  for (const script of scripts) {
+    for (const pattern of script.matches ?? []) {
+      assert.match(
+        pattern,
+        /^http:\/\/(localhost|127\.0\.0\.1)\/\*\/ott-page\.html$/,
+        `content script may not be injected into ${pattern}`,
+      );
+    }
+  }
+});
+
+test('실제 사이트 이름이 매니페스트 어디에도 없다', () => {
+  const serialised = JSON.stringify(manifest);
+  for (const host of ['youtube', 'netflix', 'tving', 'wavve', 'disney', 'coupang']) {
+    assert.ok(!serialised.includes(host), `manifest must not reference ${host} yet`);
+  }
+});
+
+test('웹 접근 자원은 확장 자신의 코드뿐이고 루프백에만 열린다', () => {
+  for (const entry of manifest.web_accessible_resources ?? []) {
+    for (const resource of entry.resources ?? []) {
+      assert.match(resource, /^src\/.*\.js$/, `unexpected exposed resource: ${resource}`);
+    }
+    for (const pattern of entry.matches ?? []) {
+      assert.match(pattern, /^http:\/\/(localhost|127\.0\.0\.1)\/\*$/);
+    }
+  }
+});
+
 test('권한 목록은 명시적으로 승인된 것뿐이다', () => {
   // 새 권한을 넣으려면 이 목록을 고쳐야 하고, 그러면 리뷰에서 눈에 띕니다.
   const allowed = new Set(['storage', 'activeTab', 'scripting']);
