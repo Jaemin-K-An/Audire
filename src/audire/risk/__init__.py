@@ -1,6 +1,7 @@
 """Word-level mishearing risk: features, models, calibration and explanations."""
 
 from audire.risk.advanced import (
+    CrossFittedResidualRiskModel,
     ListenerRankingModel,
     ResidualRiskModel,
     SplineAdditiveRiskModel,
@@ -58,6 +59,7 @@ __all__ = [
     "MODEL_VERSION",
     "CalibratedRiskModel",
     "CalibrationMethod",
+    "CrossFittedResidualRiskModel",
     "FeatureMatrix",
     "FeatureSpec",
     "GradientBoostedRiskModel",

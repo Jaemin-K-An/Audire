@@ -1,0 +1,51 @@
+# AUDIRE E28 — Phase D 절제: 목표 음소 개별 지목 블록이 무엇을 더하는가 (Simulator v2).
+#
+# 미션이 요구한 절제 사슬을 그대로 사전등록합니다.
+#   clinical_plus_confusion  ->  clinical_plus_confusion_rich
+#     ->  exact_target (D1)  ->  exact_target_offdiag (D2/D3)
+# 각 arm 은 앞의 것을 포함하므로 차이가 곧 그 블록의 몫입니다. 지는 arm 도 표에 남습니다.
+#
+# 두 시뮬레이터 모두에서 돌립니다. V1 은 (오류수, 음절수) 만으로 결과가 결정되어 단어 수준
+# 신호가 없고(RESULTS §14), V2 는 복구가 오류 위치와 음운적 거리에 달려 있습니다(§15).
+# 두 조건을 함께 봐야 "블록이 아무것도 못 했다" 와 "찾을 것이 없었다" 를 구분할 수 있습니다.
+
+name: e28_exact_target_v2
+description: >-
+  목표 음소 개별 지목(D1)과 위치별 오프대각 구조(D2/D3)가 청취자 홀드아웃 성능을 올리는지
+  Simulator v2 에서 절제로 확인합니다.
+
+simulation:
+  name: e28_cohort_v2
+  seeds: [101, 202, 303, 404, 505]
+  n_listeners: 80
+  n_calibration_trials: 100
+  n_word_trials: 250
+  snr_conditions_db: [20.0]
+  speakers: [male, female]
+  simulator_version: v2
+
+arms:
+  - word_context_only
+  - clinical_plus_confusion
+  - clinical_plus_confusion_rich
+  - exact_target
+  - exact_target_offdiag
+
+models: [logistic]
+
+n_splits: 5
+calibration: none
+n_bootstrap: 200
+ece_bins: 10
+decision_threshold: 0.5
+
+caption_budgets: [0.10, 0.20, 0.30, 0.50]
+threshold_targets: [0.20]
+
+contrasts:
+  - [clinical_plus_confusion_rich, clinical_plus_confusion]
+  - [exact_target, clinical_plus_confusion_rich]
+  - [exact_target_offdiag, exact_target]
+  - [exact_target_offdiag, clinical_plus_confusion]
+
+contrast_metrics: [pr_auc, brier]

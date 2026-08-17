@@ -292,6 +292,7 @@ MODEL_REGISTRY: dict[str, type[RiskModel]] = {
 #: :func:`known_models` still reports them so a config typo gets the full candidate list.
 _LAZY_MODELS: dict[str, str] = {
     "residual": "ResidualRiskModel",
+    "cross_fitted_residual": "CrossFittedResidualRiskModel",
     "spline_gam": "SplineAdditiveRiskModel",
     "lambdamart": "ListenerRankingModel",
 }

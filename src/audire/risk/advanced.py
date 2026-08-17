@@ -437,3 +437,168 @@ class ListenerRankingModel(RiskModel):
                 "policy uses it"
             ),
         }
+
+
+@dataclass
+class CrossFittedResidualRiskModel(RiskModel):
+    """Phase E — 잔차를 **폴드 밖 기저 예측** 위에서 적합합니다.
+
+    기존 :class:`ResidualRiskModel` 의 위험
+    ---------------------------------------
+    기존 구현은 기저 모델을 훈련 청취자 전체에 적합한 뒤, **같은 행들에 대한 예측**을
+    offset 으로 써서 잔차를 적합합니다. 그 예측은 표본 안(in-sample)이라 실제보다
+    낙관적이고, 잔차 단계는 "이 청취자가 이 단어를 유난히 어려워하는가" 가 아니라
+    "기저 모델이 자기 훈련 데이터에서 어디를 과신했는가" 를 배우게 됩니다. 그 보정은
+    홀드아웃 청취자에게 옮겨지지 않습니다.
+
+    교차적합
+    --------
+    바깥 훈련 청취자를 다시 청취자 단위 내부 폴드로 나누고, 내부 훈련 청취자로 적합한
+    기저 모델이 내부 검증 청취자를 예측하게 합니다. 모든 바깥 훈련 행이 **자기 청취자를
+    보지 않은** 기저 모델의 예측을 받고, 잔차는 그 offset 위에서만 적합됩니다. 마지막에
+    기저 모델을 바깥 훈련 청취자 전체로 다시 적합해 예측에 씁니다.
+
+    누출 방지
+    ---------
+    바깥 홀드아웃 청취자는 기저 학습·잔차 학습·전처리 어디에도 들어가지 않습니다. 내부
+    폴드도 청취자 단위이므로 한 청취자의 행이 자기 기저 예측을 만드는 데 쓰이지 않습니다.
+    """
+
+    name: str = "cross_fitted_residual"
+    C: float = 1.0
+    residual_l2: float = 1.0
+    max_iter: int = 2000
+    random_state: int = 0
+    #: 내부 폴드 수. 바깥 폴드와 독립이며, 작으면 offset 이 거칠고 크면 느립니다.
+    n_inner_splits: int = 4
+    _base: Pipeline | None = None
+    _residual: FloatArray | None = None
+    _base_idx: list[int] = field(default_factory=list)
+    _personal_idx: list[int] = field(default_factory=list)
+    _imputer: SimpleImputer | None = None
+    _scaler: StandardScaler | None = None
+    feature_names: tuple[str, ...] = ()
+    n_train: int = 0
+    #: 내부 폴드가 실제로 몇 개 돌았는지. 청취자가 적어 줄어들면 여기서 드러납니다.
+    n_inner_folds_used: int = 0
+
+    def _make_base(self) -> Pipeline:
+        return Pipeline(
+            [
+                ("impute", SimpleImputer(strategy="median", keep_empty_features=True)),
+                ("scale", StandardScaler()),
+                (
+                    "clf",
+                    LogisticRegression(
+                        C=self.C,
+                        l1_ratio=0.0,
+                        max_iter=self.max_iter,
+                        random_state=self.random_state,
+                        solver="lbfgs",
+                    ),
+                ),
+            ]
+        )
+
+    def fit(self, matrix: FeatureMatrix) -> CrossFittedResidualRiskModel:
+        from audire.eval.splits import listener_folds
+
+        if matrix.y is None:
+            raise ValueError("cannot fit without labels")
+        y = matrix.y
+        if np.unique(y).size < 2:
+            raise ValueError(
+                "training data has a single class; a probability model cannot be fitted"
+            )
+
+        self.feature_names = matrix.feature_names
+        self._base_idx, self._personal_idx = _split_columns(matrix.feature_names)
+        if not self._personal_idx:
+            raise ValueError(
+                "cross_fitted_residual 모델은 개인 혼동 특징(x_/ix_/x2_)이 있는 arm 에서만 "
+                "의미가 있습니다"
+            )
+
+        base_x = matrix.X[:, self._base_idx]
+        n_listeners = int(np.unique(matrix.groups).size)
+        n_inner = min(self.n_inner_splits, n_listeners)
+        if n_inner < 2:
+            raise ValueError(
+                f"교차적합에는 최소 2명의 훈련 청취자가 필요합니다 (현재 {n_listeners}명)"
+            )
+
+        # 폴드 밖 기저 예측. 모든 행이 자기 청취자를 보지 않은 모델의 예측을 받습니다.
+        oof = np.full(y.shape, np.nan, dtype=np.float64)
+        folds = listener_folds(
+            matrix.groups, y, n_splits=n_inner, stratify=True, seed=self.random_state
+        )
+        for fold in folds:
+            inner = self._make_base()
+            inner.fit(base_x[fold.train_idx], y[fold.train_idx])
+            oof[fold.test_idx] = inner.predict_proba(base_x[fold.test_idx])[:, 1]
+        self.n_inner_folds_used = len(folds)
+
+        if np.any(~np.isfinite(oof)):
+            raise RuntimeError(
+                "일부 훈련 행이 폴드 밖 기저 예측을 받지 못했습니다; 내부 분할이 불완전합니다"
+            )
+
+        personal = matrix.X[:, self._personal_idx]
+        self._imputer = SimpleImputer(strategy="median", keep_empty_features=True).fit(personal)
+        self._scaler = StandardScaler().fit(self._imputer.transform(personal))
+        z = self._scaler.transform(self._imputer.transform(personal))
+        # 잔차는 **폴드 밖** offset 위에서만 적합됩니다.
+        self._residual = _fit_offset_logistic(z, y, _logit(oof), self.residual_l2)
+
+        # 예측에 쓸 기저 모델은 바깥 훈련 청취자 전체로 다시 적합합니다.
+        self._base = self._make_base()
+        self._base.fit(base_x, y)
+        self.n_train = len(matrix)
+        return self
+
+    def predict_proba(self, matrix: FeatureMatrix) -> FloatArray:
+        if (
+            self._base is None
+            or self._residual is None
+            or self._imputer is None
+            or self._scaler is None
+        ):
+            raise ValueError("cross-fitted residual model is not fitted")
+        if matrix.feature_names != self.feature_names:
+            raise ValueError("feature columns changed between fit and predict")
+        offset = _logit(self._base.predict_proba(matrix.X[:, self._base_idx])[:, 1])
+        z = self._scaler.transform(self._imputer.transform(matrix.X[:, self._personal_idx]))
+        design = np.hstack([np.ones((z.shape[0], 1)), z])
+        out: FloatArray = 1.0 / (1.0 + np.exp(-(offset + design @ self._residual)))
+        return out
+
+    @property
+    def is_fitted(self) -> bool:
+        return self._base is not None and self._residual is not None
+
+    def residual_strength(self) -> float:
+        """절편을 뺀 잔차 계수의 L2 노름.
+
+        0 에 가까우면 개인 블록이 기저 예측 위에 아무것도 더하지 못한 것이며, 그것은
+        숨기지 않고 보고해야 할 음성 결과입니다.
+        """
+        if self._residual is None:
+            raise ValueError("model is not fitted")
+        return float(np.linalg.norm(self._residual[1:]))
+
+    def describe(self) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "name": self.name,
+            "family": "cross_fitted_base_plus_personal_residual",
+            "model_version": MODEL_VERSION,
+            "fitted": self.is_fitted,
+            "n_train": self.n_train,
+            "n_base_features": len(self._base_idx),
+            "n_personal_features": len(self._personal_idx),
+            "n_inner_splits_requested": self.n_inner_splits,
+            "n_inner_folds_used": self.n_inner_folds_used,
+            "residual_l2": self.residual_l2,
+        }
+        if self.is_fitted:
+            out["residual_strength"] = self.residual_strength()
+        return out

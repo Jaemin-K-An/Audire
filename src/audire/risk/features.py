@@ -40,7 +40,17 @@ from audire.profile.schema import Ear, HearingProfile
 
 FloatArray = npt.NDArray[np.float64]
 
-FeatureBlock = Literal["word", "context", "pta", "clinical", "confusion", "confusion_rich"]
+FeatureBlock = Literal[
+    "word",
+    "context",
+    "pta",
+    "clinical",
+    "confusion",
+    "confusion_rich",
+    # Phase D. 음소를 개별적으로 지목하는 블록. 부류 평균이 지우는 정보를 되살립니다.
+    "exact_target",
+    "exact_target_offdiag",
+]
 
 #: The preregistered ablation arms (docs/EXPERIMENT_PLAN.md E4). Each is a set of blocks.
 ABLATION_ARMS: dict[str, tuple[FeatureBlock, ...]] = {
@@ -58,6 +68,25 @@ ABLATION_ARMS: dict[str, tuple[FeatureBlock, ...]] = {
         "confusion",
         "confusion_rich",
     ),
+    # Phase D. 기존 arm 을 지우지 않고 위에 쌓습니다. 절제가 가능해야 어느 블록이 무엇을
+    # 하는지 말할 수 있습니다.
+    "exact_target": (
+        "word",
+        "context",
+        "clinical",
+        "confusion",
+        "confusion_rich",
+        "exact_target",
+    ),
+    "exact_target_offdiag": (
+        "word",
+        "context",
+        "clinical",
+        "confusion",
+        "confusion_rich",
+        "exact_target",
+        "exact_target_offdiag",
+    ),
 }
 
 #: Floor value for a diagonal probability when taking logs.
@@ -73,6 +102,8 @@ BLOCK_PREFIXES: dict[str, tuple[str, ...]] = {
     "clinical": ("h_",),
     "confusion": ("x_",),
     "confusion_rich": ("ix_", "w2_", "x2_"),
+    "exact_target": ("et_",),
+    "exact_target_offdiag": ("eo_",),
 }
 
 
@@ -384,6 +415,18 @@ class FeatureSpec:
             from audire.risk.confusion_features import confusion_rich_features
 
             out.update(confusion_rich_features(word, confusion))
+        if "exact_target" in self.blocks:
+            if confusion is None:
+                raise ValueError(f"arm {self.name!r} needs a ConfusionProfile but none was given")
+            from audire.risk.exact_target import exact_target_features
+
+            out.update(exact_target_features(word, confusion))
+        if "exact_target_offdiag" in self.blocks:
+            if confusion is None:
+                raise ValueError(f"arm {self.name!r} needs a ConfusionProfile but none was given")
+            from audire.risk.exact_target import exact_target_offdiag_features
+
+            out.update(exact_target_offdiag_features(word, confusion))
         return out
 
 
