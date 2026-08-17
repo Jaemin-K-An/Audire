@@ -87,6 +87,18 @@ ABLATION_ARMS: dict[str, tuple[FeatureBlock, ...]] = {
         "exact_target",
         "exact_target_offdiag",
     ),
+    # ------------------------------------------------------------------ 라이브 자막 arm
+    #
+    # 브라우저 DOM 자막 모드에는 음향 맥락이 없습니다. 그래서 이 arm 들은 "context" 블록을
+    # **아예 포함하지 않습니다** — 전체 행렬을 만든 뒤 c_snr_db 를 지우는 방식이 아닙니다.
+    # 그렇게 하면 전처리 통계와 열 순서가 지워진 열의 존재에 의존하게 되고, 학습과 추론의
+    # 스키마가 조용히 어긋날 수 있습니다.
+    #
+    # 라이브 모델은 추론 시 갖게 될 것과 같은 정보 제약 아래에서 학습됩니다
+    # (audire.live.contract, ADR-0021).
+    "live_word_context": ("word",),
+    "live_word_context_clinical": ("word", "clinical"),
+    "live_word_context_clinical_confusion": ("word", "clinical", "confusion"),
 }
 
 #: Floor value for a diagonal probability when taking logs.
