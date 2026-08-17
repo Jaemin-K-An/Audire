@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import platform
+import secrets
 import subprocess
 import sys
 import traceback
@@ -25,6 +27,11 @@ import yaml
 
 from audire.config.paths import artifacts_dir, experiments_dir, manifests_dir, repo_root
 from audire.data.manifest import accessed_sources, reset_accessed
+
+
+class RegistryCollision(Exception):
+    """Two different runs claimed the same ``run_id``."""
+
 
 REGISTRY_SCHEMA_VERSION = 1
 
@@ -179,6 +186,13 @@ class RunRecord:
     config: dict[str, Any]
     data_manifests: dict[str, str] = field(default_factory=dict)
     artifacts: list[str] = field(default_factory=list)
+    #: SHA-256 of each artifact at the moment the run wrote it, keyed by the same relative
+    #: path that appears in :attr:`artifacts`. Without it the registry records only that a
+    #: file was produced, not what was in it, so a results file edited after the fact is
+    #: indistinguishable from the one the run actually generated. Kept as a separate field
+    #: rather than restructuring ``artifacts`` so that runs recorded before this existed
+    #: still load and stay reproducible.
+    artifact_digests: dict[str, str] = field(default_factory=dict)
     metrics: dict[str, Any] = field(default_factory=dict)
     status: str = "running"
     finished_at_utc: str | None = None
@@ -198,8 +212,13 @@ def new_run(
     """Start a run record. The run id encodes the experiment, time and commit."""
     now = datetime.now(UTC)
     sha = git_sha(short=True)
+    # The random suffix is what makes the id unique. Experiment name + second-resolution
+    # timestamp + commit collide whenever two runs of the same experiment start in the
+    # same second — easy to hit with fast configs, loops, or parallel invocations — and
+    # `append_run` replaces by run_id, so the earlier run's record was silently destroyed.
+    token = secrets.token_hex(3)
     return RunRecord(
-        run_id=f"{experiment}-{now:%Y%m%dT%H%M%SZ}-{sha}",
+        run_id=f"{experiment}-{now:%Y%m%dT%H%M%SZ}-{sha}-{token}",
         experiment=experiment,
         started_at_utc=now.isoformat(),
         git_sha=git_sha(),
@@ -222,18 +241,31 @@ def registry_path() -> Path:
 
 
 def append_run(record: RunRecord) -> Path:
-    """Append (or replace by ``run_id``) a run record in the registry."""
+    """Append, or update in place, a run record in the registry.
+
+    Replacing by ``run_id`` is how a run's own lifecycle works: ``new_run`` writes a
+    ``running`` record and ``finish_run``/``fail_run`` replace it with the final one. That
+    is only safe while a ``run_id`` identifies exactly one run, so a record whose
+    ``started_at_utc`` disagrees with the stored one is treated as a collision and
+    refused. Overwriting it would delete a completed experiment without a trace.
+    """
     path = registry_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     payload: dict[str, Any] = {"schema_version": REGISTRY_SCHEMA_VERSION, "runs": []}
     if path.exists():
         existing = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-        payload["runs"] = [r for r in existing.get("runs", []) if r.get("run_id") != record.run_id]
+        for stored in existing.get("runs", []):
+            if stored.get("run_id") != record.run_id:
+                payload["runs"].append(stored)
+                continue
+            if stored.get("started_at_utc") != record.started_at_utc:
+                raise RegistryCollision(
+                    f"run_id {record.run_id!r} 가 이미 다른 실행에 쓰이고 있습니다 "
+                    f"(기록된 시작 시각 {stored.get('started_at_utc')}, "
+                    f"덮어쓰려는 실행 {record.started_at_utc}). 기존 기록을 덮어쓰지 않습니다."
+                )
     payload["runs"].append(record.to_dict())
-    path.write_text(
-        yaml.safe_dump(payload, allow_unicode=True, sort_keys=False, width=100),
-        encoding="utf-8",
-    )
+    _atomic_write(path, yaml.safe_dump(payload, allow_unicode=True, sort_keys=False, width=100))
     return path
 
 
@@ -252,16 +284,55 @@ def run_artifact_dir(record: RunRecord) -> Path:
 
 
 def save_artifact(record: RunRecord, name: str, payload: Any) -> Path:
-    """Write a JSON artifact and register its path on the run record."""
+    """Write a JSON artifact, then register its path **and its digest**."""
     path = run_artifact_dir(record) / name
-    path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2, default=_json_default),
-        encoding="utf-8",
-    )
+    text = json.dumps(payload, ensure_ascii=False, indent=2, default=_json_default)
+    _atomic_write(path, text)
     rel = str(path.relative_to(repo_root())) if path.is_relative_to(repo_root()) else str(path)
     if rel not in record.artifacts:
         record.artifacts.append(rel)
+    record.artifact_digests[rel] = hashlib.sha256(text.encode("utf-8")).hexdigest()
     return path
+
+
+def verify_artifacts(run_id: str) -> dict[str, str]:
+    """Re-hash a recorded run's artifacts and report the state of each one.
+
+    Values are ``"match"``, ``"modified"``, ``"missing"``, or ``"not_recorded"`` for
+    artifacts written before digests existed. Reporting ``"not_recorded"`` rather than
+    quietly passing keeps the difference between "verified" and "unverifiable" visible.
+    """
+    record = next((r for r in load_runs() if r.get("run_id") == run_id), None)
+    if record is None:
+        raise KeyError(f"기록되지 않은 run_id: {run_id!r}")
+
+    digests: dict[str, str] = record.get("artifact_digests") or {}
+    out: dict[str, str] = {}
+    for rel in record.get("artifacts", []):
+        path = repo_root() / rel
+        if not path.exists():
+            out[rel] = "missing"
+        elif rel not in digests:
+            out[rel] = "not_recorded"
+        else:
+            actual = hashlib.sha256(path.read_text(encoding="utf-8").encode("utf-8")).hexdigest()
+            out[rel] = "match" if actual == digests[rel] else "modified"
+    return out
+
+
+def _atomic_write(path: Path, text: str) -> None:
+    """Write via a temporary file and :func:`os.replace`.
+
+    A plain ``write_text`` truncates the destination first, so a crash or a full disk
+    part-way through leaves a truncated file. For the registry that means losing the
+    record of every run, not just the one being written.
+    """
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, path)  # noqa: PTH105 - patched in tests to simulate a failed replace
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def _json_default(obj: Any) -> Any:

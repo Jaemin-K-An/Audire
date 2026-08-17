@@ -50,12 +50,22 @@ def test_run_record_captures_full_provenance() -> None:
 
 
 def test_run_id_embeds_the_short_commit_sha() -> None:
-    """run_id의 SHA 접미사가 'unknown'이 아니어야 한다(과거 인자 구성 버그 회귀)."""
+    """run_id의 SHA 성분이 'unknown'이 아니어야 한다(과거 인자 구성 버그 회귀).
+
+    id 형식은 `실험명-시각-짧은sha-토큰` 입니다. 무작위 토큰이 뒤에 붙은 이유는 같은 초에
+    시작된 두 실행이 같은 id 를 받아 먼저 끝난 기록이 덮어써지던 결함 때문입니다. 이
+    테스트가 지키려는 것은 그 형식이 아니라 SHA 가 실제 커밋을 가리킨다는 사실입니다.
+    """
     short = git_sha(short=True)
     if short == "unknown":
         pytest.skip("git 저장소가 아님")
-    assert new_run("demo", {}, [1]).run_id.endswith(short)
+    assert f"-{short}-" in new_run("demo", {}, [1]).run_id
     assert 6 <= len(short) < len(git_sha())
+
+
+def test_run_ids_are_unique_within_the_same_second() -> None:
+    ids = {new_run("demo", {}, [1]).run_id for _ in range(20)}
+    assert len(ids) == 20
 
 
 def test_finished_and_failed_runs_are_both_recorded() -> None:

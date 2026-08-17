@@ -225,6 +225,37 @@ def model_compare(config: ConfigOpt) -> None:
     typer.echo(f"\n단서: {head['caveat']}")
 
 
+@app.command("verify-runs")
+def verify_runs(
+    run_id: Annotated[str | None, typer.Option("--run-id", help="기본값: 기록된 모든 실행")] = None,
+) -> None:
+    """기록된 실행의 아티팩트를 다시 해싱해 사후 수정 여부를 확인합니다."""
+    from audire.experiments.registry import load_runs, verify_artifacts
+
+    targets = [run_id] if run_id else [r["run_id"] for r in load_runs()]
+    if not targets:
+        typer.echo("기록된 실행이 없습니다")
+        raise typer.Exit(0)
+
+    totals: dict[str, int] = {}
+    for rid in targets:
+        states = verify_artifacts(rid)
+        for state in states.values():
+            totals[state] = totals.get(state, 0) + 1
+        # 문제 있는 항목만 자세히 보여줍니다. 정상은 집계로 충분합니다.
+        for rel, state in sorted(states.items()):
+            if state != "match":
+                typer.echo(f"  {state:13s} {rid}  {rel}")
+
+    typer.echo(f"\n실행 {len(targets)}건, 아티팩트 {sum(totals.values())}개")
+    for state in ("match", "not_recorded", "modified", "missing"):
+        if state in totals:
+            typer.echo(f"  {state:13s} {totals[state]}")
+    # 수정/누락은 결과를 신뢰할 수 없다는 뜻이므로 종료 코드로도 알립니다.
+    if totals.get("modified") or totals.get("missing"):
+        raise typer.Exit(1)
+
+
 @app.command()
 def runs() -> None:
     """List recorded experiment runs with their provenance."""

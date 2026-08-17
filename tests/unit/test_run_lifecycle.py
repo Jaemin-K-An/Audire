@@ -19,11 +19,22 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
 
-from audire.experiments.registry import load_runs, tracked_run
+from audire.experiments.registry import (
+    RegistryCollision,
+    append_run,
+    finish_run,
+    load_runs,
+    new_run,
+    registry_path,
+    save_artifact,
+    tracked_run,
+    verify_artifacts,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -246,3 +257,126 @@ def test_successful_runner_still_completes() -> None:
     rec = _only_run()
     assert rec["status"] == "completed"
     assert rec["artifacts"], "성공한 실행은 아티팩트를 남겨야 한다"
+
+
+# ================================================ 레지스트리 견고성 (충돌·원자성·다이제스트)
+
+
+def test_two_runs_started_in_the_same_second_get_distinct_ids():
+    """회귀 테스트.
+
+    run_id 는 `실험명-초단위시각-짧은sha` 였습니다. 같은 실험을 같은 초에 두 번 시작하면
+    — 빠른 설정, 루프, 병렬 호출에서 쉽게 일어납니다 — id 가 같아지고 `append_run` 이
+    run_id 로 교체하므로 **먼저 끝난 실행의 기록이 흔적 없이 사라졌습니다.**
+    """
+    a = new_run("exp", {"n": 1}, [1])
+    b = new_run("exp", {"n": 2}, [2])
+    assert a.run_id != b.run_id
+
+    finish_run(a, {"r": "A"})
+    finish_run(b, {"r": "B"})
+    recorded = {r["run_id"]: r["metrics"] for r in load_runs()}
+    assert len(recorded) == 2
+    assert list(recorded.values()) != [{"r": "B"}], "먼저 끝난 실행이 사라졌습니다"
+
+
+def test_a_colliding_run_id_is_refused_rather_than_overwriting():
+    """id 가 충돌하면 조용히 덮어쓰지 않고 거부해야 합니다."""
+    a = new_run("exp", {"n": 1}, [1])
+    finish_run(a, {"r": "A"})
+
+    intruder = new_run("exp", {"n": 2}, [2])
+    intruder.run_id = a.run_id
+    with pytest.raises(RegistryCollision, match="이미 다른 실행"):
+        finish_run(intruder, {"r": "B"})
+
+    survived = [r for r in load_runs() if r["run_id"] == a.run_id]
+    assert len(survived) == 1
+    assert survived[0]["metrics"] == {"r": "A"}
+
+
+def test_a_runs_own_lifecycle_still_updates_in_place():
+    """정상 경로는 막히면 안 됩니다: running -> completed 는 같은 기록을 갱신합니다."""
+    record = new_run("exp", {"n": 1}, [1])
+    append_run(record)
+    assert [r["status"] for r in load_runs()] == ["running"]
+
+    finish_run(record, {"r": "done"})
+    rows = load_runs()
+    assert len(rows) == 1
+    assert rows[0]["status"] == "completed"
+
+
+def test_registry_survives_a_failed_write(monkeypatch):
+    """레지스트리를 통째로 잃는 것은 모든 실행 기록을 잃는 것입니다."""
+    finish_run(new_run("exp", {"n": 1}, [1]), {"r": "A"})
+    before = registry_path().read_text(encoding="utf-8")
+
+    def explode(src, dst):
+        raise OSError("교체 도중 디스크 오류")
+
+    # 이 패치만 되돌립니다. monkeypatch.undo() 는 autouse 격리 픽스처까지 되돌려
+    # 이후 검사가 실제 저장소의 레지스트리를 보게 만듭니다.
+    with monkeypatch.context() as patched:
+        patched.setattr(os, "replace", explode)
+        with pytest.raises(OSError, match="교체 도중"):
+            finish_run(new_run("exp", {"n": 2}, [2]), {"r": "B"})
+
+    assert registry_path().read_text(encoding="utf-8") == before
+    assert len(load_runs()) == 1  # 여전히 읽을 수 있는 유효한 YAML
+
+
+def test_no_temporary_files_are_left_in_the_registry_directory():
+    finish_run(new_run("exp", {"n": 1}, [1]), {"r": "A"})
+    leftovers = [p.name for p in registry_path().parent.iterdir() if ".tmp" in p.name]
+    assert leftovers == []
+
+
+def test_artifact_digest_is_recorded_and_detects_later_edits():
+    """경로만 기록하면 '파일이 생겼다' 는 알지만 '무엇이 들었는지' 는 모릅니다."""
+    record = new_run("exp", {"n": 1}, [1])
+    path = save_artifact(record, "out.json", {"value": 1})
+    finish_run(record, {})
+
+    key = record.artifacts[0]
+    assert verify_artifacts(record.run_id) == {key: "match"}
+
+    path.write_text('{"value": 999}', encoding="utf-8")
+    assert verify_artifacts(record.run_id) == {key: "modified"}
+
+    path.unlink()
+    assert verify_artifacts(record.run_id) == {key: "missing"}
+
+
+def test_artifacts_without_a_recorded_digest_are_reported_as_unverifiable():
+    """검증 불가와 검증 통과는 다릅니다. 다이제스트 도입 이전 기록이 조용히 통과하면 안 됩니다."""
+    record = new_run("exp", {"n": 1}, [1])
+    save_artifact(record, "out.json", {"value": 1})
+    record.artifact_digests.clear()  # 예전 스키마로 기록된 실행을 흉내냅니다
+    finish_run(record, {})
+    assert verify_artifacts(record.run_id) == {record.artifacts[0]: "not_recorded"}
+
+
+def test_verify_artifacts_rejects_an_unknown_run_id():
+    with pytest.raises(KeyError, match="기록되지 않은"):
+        verify_artifacts("no-such-run")
+
+
+def test_verify_runs_cli_exits_nonzero_when_an_artifact_was_modified(monkeypatch):
+    """무결성 확인은 종료 코드로 실패를 알려야 자동화에 쓸 수 있습니다."""
+    from typer.testing import CliRunner
+
+    from audire.cli import app
+
+    record = new_run("exp", {"n": 1}, [1])
+    path = save_artifact(record, "out.json", {"value": 1})
+    finish_run(record, {})
+
+    runner = CliRunner()
+    ok = runner.invoke(app, ["verify-runs", "--run-id", record.run_id])
+    assert ok.exit_code == 0, ok.output
+
+    path.write_text('{"value": 999}', encoding="utf-8")
+    tampered = runner.invoke(app, ["verify-runs", "--run-id", record.run_id])
+    assert tampered.exit_code == 1
+    assert "modified" in tampered.output
