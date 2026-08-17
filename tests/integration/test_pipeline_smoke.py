@@ -531,3 +531,42 @@ def test_faster_whisper_accepts_compressed_media(
     assert transcript.tokens
     assert transcript.hangul_tokens
     assert transcript.provenance["media"] == encoded.name
+
+
+def test_non_finite_timings_are_rejected_at_construction() -> None:
+    """회귀 테스트.
+
+    나머지 검사는 전부 부등식이고 NaN 과의 부등식은 항상 False 이므로, NaN 타임스탬프가
+    모든 검사를 조용히 통과했습니다. 그 값은 `timing_problems`(역시 부등식이라 아무 일도
+    하지 않음)를 지나 자막 타임라인과 SRT/VTT 내보내기까지 흘러가 깨진 타임코드가 됩니다.
+    """
+    for bad in (float("nan"), float("inf"), float("-inf")):
+        with pytest.raises(ValueError, match="non-finite"):
+            Token("가", bad, 1.0)
+        with pytest.raises(ValueError, match="non-finite"):
+            Token("가", 0.0, bad)
+
+
+def test_non_finite_transcript_duration_is_rejected() -> None:
+    """NaN 길이는 '미디어 길이를 넘었는가' 검사를 통째로 무력화합니다."""
+    with pytest.raises(ValueError, match="finite and non-negative"):
+        Transcript(
+            tokens=(),
+            language="ko",
+            language_probability=0.9,
+            duration_s=float("nan"),
+            backend="test",
+            model_id="test",
+        )
+
+
+def test_non_finite_language_probability_is_rejected() -> None:
+    with pytest.raises(ValueError, match=r"finite value in \[0, 1\]"):
+        Transcript(
+            tokens=(),
+            language="ko",
+            language_probability=float("nan"),
+            duration_s=1.0,
+            backend="test",
+            model_id="test",
+        )

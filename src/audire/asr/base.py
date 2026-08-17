@@ -14,6 +14,7 @@ swapped without touching risk or captioning. Two rules are structural, not styli
 
 from __future__ import annotations
 
+import math
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -34,6 +35,15 @@ class Token:
     confidence: float | None = None
 
     def __post_init__(self) -> None:
+        # Finiteness is checked first, and explicitly. Every other guard here is an
+        # inequality, and every inequality against NaN is False, so a NaN timestamp
+        # passed all of them silently. It then flowed into `timing_problems` (whose
+        # comparisons also do nothing), into the caption timeline, and into SRT/VTT
+        # exports as a garbage timecode. `inf` slipped through the same way.
+        for field_name in ("start_s", "end_s"):
+            value = getattr(self, field_name)
+            if not math.isfinite(value):
+                raise ValueError(f"token {self.text!r} has a non-finite {field_name}: {value}")
         if self.end_s < self.start_s:
             raise ValueError(
                 f"token {self.text!r} ends ({self.end_s}) before it starts ({self.start_s})"
@@ -70,6 +80,19 @@ class Transcript:
     model_id: str
     #: Everything needed to reproduce: revision, device, compute type, decode options.
     provenance: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not math.isfinite(self.duration_s) or self.duration_s < 0:
+            raise ValueError(
+                f"transcript duration must be finite and non-negative: {self.duration_s}"
+            )
+        if self.language_probability is not None and not (
+            math.isfinite(self.language_probability) and 0.0 <= self.language_probability <= 1.0
+        ):
+            raise ValueError(
+                f"language_probability must be a finite value in [0, 1], "
+                f"got {self.language_probability}"
+            )
 
     def __len__(self) -> int:
         return len(self.tokens)
