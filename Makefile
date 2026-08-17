@@ -29,6 +29,9 @@ bootstrap: $(VENV)/pyvenv.cfg ## Create the venv and install pinned dependencies
 	$(BIN)/python -m pip install -e ".[api,data,dev]"
 	@echo "bootstrap complete. ASR extras are optional: make bootstrap-asr"
 
+bootstrap-research: $(VENV)/pyvenv.cfg ## Additionally install optional research models (LightGBM)
+	$(BIN)/python -m pip install -e ".[research-models]"
+
 bootstrap-asr: $(VENV)/pyvenv.cfg ## Additionally install the ASR backend (large download)
 	$(BIN)/python -m pip install -e ".[asr]"
 

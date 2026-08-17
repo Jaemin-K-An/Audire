@@ -474,3 +474,74 @@ def test_integrity_job_does_not_depend_on_other_jobs():
         (repo_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     )
     assert "needs" not in ci["jobs"]["integrity"]
+
+
+# ============================================ P0 — 선택적 연구 모델 의존성 계약
+
+
+def test_lightgbm_is_declared_as_an_optional_extra_not_a_core_dependency():
+    """회귀 테스트.
+
+    LambdaMART(E21)를 추가하면서 lightgbm 을 pyproject 에도 requirements.lock 에도 선언하지
+    않았습니다. 개발 환경에는 수동 설치되어 있어 로컬에서는 통과했지만, CI 는 그것을
+    설치하지 않으므로 strict mypy 가 모듈을 찾지 못해 **pytest 에 도달하기 전에 멈췄습니다.**
+    로컬 통과가 CI 통과의 대체물이 아니라는 사례입니다.
+    """
+    import tomllib
+
+    project = tomllib.loads((repo_root() / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    core = " ".join(project.get("dependencies", []))
+    assert "lightgbm" not in core, "배포 경로는 lightgbm 없이 동작해야 합니다"
+
+    extras = project["optional-dependencies"]
+    assert "research-models" in extras
+    assert any("lightgbm" in spec for spec in extras["research-models"])
+    # 버전이 고정되어야 재현이 가능합니다.
+    assert any("==" in spec for spec in extras["research-models"])
+
+
+def test_mypy_override_for_lightgbm_is_narrow():
+    """전역 ignore_missing_imports 로 CI 를 초록으로 만들면 다른 결함까지 가려집니다."""
+    import tomllib
+
+    config = tomllib.loads((repo_root() / "pyproject.toml").read_text(encoding="utf-8"))
+    mypy = config["tool"]["mypy"]
+    assert mypy.get("strict") is True
+    assert "ignore_missing_imports" not in mypy, "전역 무시가 켜져 있습니다"
+
+    overrides = mypy["overrides"]
+    modules = [m for o in overrides for m in o["module"]]
+    assert "lightgbm.*" in modules
+    # 선택적 의존성만 열거되어야 하며 와일드카드 전체는 안 됩니다.
+    assert "*" not in modules
+
+
+def test_the_core_package_imports_without_the_research_extra():
+    """배포 경로가 선택적 연구 의존성에 묶이면 안 됩니다."""
+    import importlib.util
+
+    from audire.risk import known_models, make_model
+    from audire.risk.advanced import ListenerRankingModel
+
+    # 모델 목록과 구성은 lightgbm 없이도 동작해야 합니다 (지연 import).
+    assert "lambdamart" in known_models()
+    assert make_model("lambdamart").name == "lambdamart"
+    assert ListenerRankingModel.is_available() == (importlib.util.find_spec("lightgbm") is not None)
+
+
+def test_ci_runs_the_research_model_tests_in_a_dedicated_job():
+    """마커로 건너뛰기만 하면 랭킹 모델의 불변식이 아무 데서도 검증되지 않습니다."""
+    ci = yaml.safe_load(
+        (repo_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    )
+    job = ci["jobs"].get("research-models")
+    assert job is not None, "연구 모델 전용 잡이 없습니다"
+    steps = " ".join(str(s.get("run", "")) for s in job["steps"])
+    assert "research-models" in steps, "extra 를 설치해야 합니다"
+    assert "research_models" in steps, "해당 마커의 테스트를 실제로 돌려야 합니다"
+
+
+def test_optional_extra_tests_are_marked_not_silently_broken():
+    """선택적 extra 를 요구하는 테스트가 표시 없이 기본 실행에 섞이면 CI 가 빨개집니다."""
+    config_text = (repo_root() / "pyproject.toml").read_text(encoding="utf-8")
+    assert "research_models: requires the optional research-models extra" in config_text

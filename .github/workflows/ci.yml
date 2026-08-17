@@ -49,6 +49,25 @@ jobs:
           name: coverage
           path: coverage.xml
 
+  # LightGBM 은 선택적 연구 모델 extra 입니다. 기본 잡은 그것 없이 돌아 배포 경로가
+  # 가볍게 유지되는지 확인하고, 이 잡이 extra 를 설치해 랭킹 모델의 불변식을 실제로
+  # 검증합니다. 마커로 건너뛰기만 하면 그 불변식이 아무 데서도 검증되지 않습니다.
+  research-models:
+    name: optional research models (LightGBM)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[api,data,dev,research-models]"
+      - name: Ranking-model invariants actually run
+        run: pytest -m "research_models" --no-cov
+
   # The integrity gates run as their own job, deliberately.
   #
   # They used to be the last two steps of `quality`, behind lint, mypy and the full test

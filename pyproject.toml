@@ -42,6 +42,12 @@ api = [
   "python-multipart==0.0.32",
   "jinja2==3.1.6",
 ]
+# LambdaMART(E21) 연구 모델 전용. 배포 경로는 이것 없이 완전히 동작하며, E22 에서 이
+# 계열이 참조 로지스틱을 이기지 못했으므로 필수 의존성이 아닙니다. 별도 extra 로 두어
+# 기본 설치를 가볍게 유지합니다.
+research-models = [
+  "lightgbm==4.7.0",
+]
 asr = [
   "faster-whisper==1.2.1",
   "ctranslate2==4.8.1",
@@ -94,6 +100,7 @@ markers = [
   "asr: requires the ASR backend and a downloadable model",
   "e2e: requires a running API server and a browser",
   "data: requires locally fetched external data",
+  "research_models: requires the optional research-models extra (LightGBM)",
 ]
 filterwarnings = ["error::DeprecationWarning:audire.*"]
 
@@ -141,6 +148,10 @@ module = [
   "scipy.*",
   "matplotlib.*",
   "faster_whisper.*",
+  # 선택적 연구 모델 extra(research-models). 기본 설치와 CI 의 기본 경로에는 없으므로
+  # 스텁을 찾을 수 없습니다. faster_whisper 와 같은 처리이며, 전역 무시가 아니라 이
+  # 모듈에만 한정합니다.
+  "lightgbm.*",
   "soundfile.*",
   "datasets.*",
   "huggingface_hub.*",

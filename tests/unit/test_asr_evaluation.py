@@ -93,6 +93,7 @@ class _DeterministicBackend(ASRBackend):
         return {"backend": self.name, "model_id": "unit"}
 
 
+@pytest.mark.asr
 def test_asr_runner_records_success_and_failure_without_listener_risk(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

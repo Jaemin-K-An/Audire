@@ -227,12 +227,14 @@ def test_spline_outputs_are_probabilities(split):
 # -------------------------------------------------------------------- E21 랭킹 모델
 
 
+@pytest.mark.research_models
 def test_ranking_query_groups_are_exactly_the_listeners(split):
     train, _ = split
     model = ListenerRankingModel(n_estimators=30).fit(train)
     assert model.n_train_groups == int(np.unique(train.groups).size)
 
 
+@pytest.mark.research_models
 def test_ranking_groups_survive_interleaved_row_order(split):
     """핵심 위험.
 
@@ -256,6 +258,7 @@ def test_ranking_groups_survive_interleaved_row_order(split):
 
 
 @pytest.mark.parametrize("perm_seed", [5, 99])
+@pytest.mark.research_models
 def test_ranking_is_invariant_to_input_row_order(split, perm_seed):
     """회귀 테스트.
 
@@ -310,6 +313,7 @@ def test_canonical_order_is_stable_across_processes():
     assert len(set(outs)) == 1, f"PYTHONHASHSEED 에 따라 순서가 달라집니다: {outs}"
 
 
+@pytest.mark.research_models
 def test_ranking_score_is_not_advertised_as_a_probability(split):
     """랭킹 점수를 확률로 쓰면 임계값 정책이 조용히 잘못된 자막량을 냅니다."""
     train, test = split
@@ -324,6 +328,7 @@ def test_ranking_score_is_not_advertised_as_a_probability(split):
     assert np.array_equal(np.argsort(score), np.argsort(proba))
 
 
+@pytest.mark.research_models
 def test_ranking_records_its_library_version(split):
     train, _ = split
     version = ListenerRankingModel(n_estimators=20).fit(train).describe()["lightgbm_version"]
@@ -333,7 +338,14 @@ def test_ranking_records_its_library_version(split):
 # ------------------------------------------------------- 누출 / 결정성 (전 모델 공통)
 
 
-@pytest.mark.parametrize("name", ["residual", "spline_gam", "lambdamart"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "residual",
+        "spline_gam",
+        pytest.param("lambdamart", marks=pytest.mark.research_models),
+    ],
+)
 def test_preprocessing_is_fitted_on_training_rows_only(split, name):
     """전처리 누출 방지.
 
@@ -351,7 +363,14 @@ def test_preprocessing_is_fitted_on_training_rows_only(split, name):
     assert np.array_equal(before, after)
 
 
-@pytest.mark.parametrize("name", ["residual", "spline_gam", "lambdamart"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "residual",
+        "spline_gam",
+        pytest.param("lambdamart", marks=pytest.mark.research_models),
+    ],
+)
 def test_same_seed_gives_identical_predictions(split, name):
     train, test = split
     kwargs = {"n_estimators": 30} if name == "lambdamart" else {}
@@ -360,7 +379,14 @@ def test_same_seed_gives_identical_predictions(split, name):
     assert np.array_equal(a, b)
 
 
-@pytest.mark.parametrize("name", ["residual", "spline_gam", "lambdamart"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "residual",
+        "spline_gam",
+        pytest.param("lambdamart", marks=pytest.mark.research_models),
+    ],
+)
 def test_calibration_wrapper_fits_on_whole_listeners_only(split, name):
     """교정기는 허용된 청취자 그룹에서만 적합되어야 합니다 (시행 단위 분할 금지)."""
     train, test = split
@@ -375,7 +401,14 @@ def test_calibration_wrapper_fits_on_whole_listeners_only(split, name):
     assert ((p >= 0) & (p <= 1)).all()
 
 
-@pytest.mark.parametrize("name", ["residual", "spline_gam", "lambdamart"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "residual",
+        "spline_gam",
+        pytest.param("lambdamart", marks=pytest.mark.research_models),
+    ],
+)
 def test_models_never_see_the_held_out_listeners(matrix, name):
     """청취자 단위 분할 무결성: 적합에 쓰인 행 수가 훈련 폴드 크기와 정확히 일치합니다."""
     fold = listener_folds(matrix.groups, matrix.y, n_splits=4, stratify=True, seed=0)[0]

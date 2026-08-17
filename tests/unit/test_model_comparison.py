@@ -245,6 +245,7 @@ def test_word_length_baseline_is_evaluated_on_the_same_rows(result):
             )
 
 
+@pytest.mark.research_models
 def test_ranking_scores_are_flagged_as_non_probabilities():
     """Brier/ECE 를 교정되지 않은 순위 점수에 대해 그대로 읽으면 잘못된 결론이 납니다."""
     out = run_model_comparison(_cfg(models=["lambdamart"], calibrations=["none"]))

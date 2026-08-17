@@ -28,3 +28,25 @@ def fitted_scorer() -> WordScorer:
     spec = FeatureSpec.arm("clinical_plus_confusion", speakers=("male", "female", "unknown"))
     model = LogisticRiskModel().fit(cohort_matrix(cohort, spec))
     return WordScorer(model=model, spec=spec)
+
+
+def pytest_collection_modifyitems(config, items):
+    """`research_models` 표시가 붙은 테스트는 extra 가 없으면 건너뜁니다.
+
+    LightGBM 은 선택적 연구 모델 extra 입니다(E22 에서 이 계열이 참조 로지스틱을 이기지
+    못했으므로 배포 필수 의존성이 아닙니다). 부재는 오류가 아니라 정상 상태이므로,
+    ImportError 로 실패하는 대신 **이유가 적힌 skip** 으로 처리합니다.
+
+    다만 CI 에는 이 extra 를 설치하고 이 테스트만 따로 돌리는 잡이 있습니다. 건너뛰는
+    것으로 끝내면 랭킹 모델의 불변식이 아무 데서도 검증되지 않기 때문입니다.
+    """
+    import importlib.util
+
+    if importlib.util.find_spec("lightgbm") is not None:
+        return
+    skip = pytest.mark.skip(
+        reason="research-models extra 없음: pip install -e '.[research-models]'"
+    )
+    for item in items:
+        if "research_models" in item.keywords:
+            item.add_marker(skip)

@@ -351,8 +351,29 @@ class ListenerRankingModel(RiskModel):
     n_train: int = 0
     n_train_groups: int = 0
 
+    @staticmethod
+    def is_available() -> bool:
+        """LightGBM 이 이 환경에 설치되어 있는가.
+
+        기본 설치에는 없습니다. E22 에서 이 계열이 참조 로지스틱을 이기지 못했으므로
+        배포 경로의 필수 의존성이 아니며, ``research-models`` extra 로 분리되어 있습니다.
+        """
+        import importlib.util
+
+        return importlib.util.find_spec("lightgbm") is not None
+
     def fit(self, matrix: FeatureMatrix) -> ListenerRankingModel:
-        import lightgbm as lgb
+        try:
+            import lightgbm as lgb
+        except ImportError as exc:
+            # 맨 ImportError 대신 무엇을 어떻게 설치해야 하는지 말해 줍니다. 이 모델은
+            # 선택적 연구 계열이므로 부재는 오류가 아니라 정상 상태입니다.
+            raise ImportError(
+                "LambdaMART(lambdamart)는 선택적 연구 모델 extra 를 필요로 합니다:\n"
+                "    pip install -e '.[research-models]'\n"
+                "또는 make bootstrap-research\n"
+                "배포 경로는 이 의존성 없이 동작합니다."
+            ) from exc
 
         if matrix.y is None:
             raise ValueError("cannot fit without labels")
