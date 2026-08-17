@@ -1,0 +1,10 @@
+{
+  "name": "audire-live",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AUDIRE 라이브 자막 브라우저 확장 (Manifest V3).",
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.js\""
+  }
+}

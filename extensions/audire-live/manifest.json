@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "AUDIRE Live",
+  "version": "0.1.0",
+  "description": "브라우저가 이미 그리고 있는 자막을 읽어 로컬 AUDIRE 가 고른 단어만 보여줍니다. 연구/접근성 소프트웨어이며 의료기기가 아닙니다.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "http://localhost/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "AUDIRE Live"
+  }
+}

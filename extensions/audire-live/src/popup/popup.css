@@ -1,0 +1,100 @@
+/* 팝업 스타일. 원격 글꼴이나 이미지를 불러오지 않습니다 — 확장이 네트워크로 나가는
+   경로는 로컬 서버 하나뿐이어야 합니다. */
+
+:root {
+  color-scheme: light dark;
+  --fg: #16181d;
+  --muted: #5b616e;
+  --bg: #ffffff;
+  --line: #d9dce3;
+  --accent: #2f5bd7;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fg: #e8eaef;
+    --muted: #9aa1b1;
+    --bg: #1b1d22;
+    --line: #343842;
+    --accent: #7f9cf0;
+  }
+}
+
+body {
+  width: 320px;
+  margin: 0;
+  padding: 14px;
+  background: var(--bg);
+  color: var(--fg);
+  font: 13px/1.5 system-ui, -apple-system, sans-serif;
+}
+
+h1 {
+  margin: 0;
+  font-size: 15px;
+}
+
+h2 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+section {
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+label {
+  display: block;
+  margin-bottom: 4px;
+}
+
+label.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+select,
+input[type='range'] {
+  width: 100%;
+}
+
+button {
+  padding: 6px 10px;
+  margin-right: 6px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: transparent;
+  color: var(--accent);
+}
+
+.state,
+.note {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.disclaimer {
+  margin: 0 0 6px;
+  padding: 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--fg);
+}
+
+footer {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}

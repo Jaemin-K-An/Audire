@@ -1,0 +1,59 @@
+<!doctype html>
+<!--
+  팝업. 인라인 스크립트가 없습니다 — MV3 의 확장 CSP 가 인라인 실행을 막으며, 그 규칙을
+  우회하려 하지 않습니다.
+-->
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>AUDIRE Live</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <h1>AUDIRE Live</h1>
+      <p id="server-state" class="state">상태를 확인하는 중…</p>
+    </header>
+
+    <section id="pairing">
+      <h2>연결</h2>
+      <p id="pairing-state" class="state"></p>
+      <button id="pair" type="button">이 기기와 페어링</button>
+      <button id="unpair" type="button" class="secondary">연결 해제</button>
+    </section>
+
+    <section id="profile">
+      <h2>청취자 프로파일</h2>
+      <label for="profile-select">채점에 쓸 프로파일</label>
+      <select id="profile-select"></select>
+      <p id="profile-state" class="state"></p>
+    </section>
+
+    <section id="volume">
+      <h2>자막량</h2>
+      <label for="rate">목표 자막률: <span id="rate-value">20%</span></label>
+      <input id="rate" type="range" min="5" max="60" step="5" value="20" />
+      <p class="note">
+        임계값은 이 비율에 맞춰 <strong>청취자마다</strong> 정해집니다. 모든 사용자에게
+        같은 기준을 쓰지 않습니다.
+      </p>
+    </section>
+
+    <section id="power">
+      <label class="row">
+        <input id="enabled" type="checkbox" />
+        <span>자막 읽기 켜기</span>
+      </label>
+      <p class="note">꺼져 있으면 어떤 페이지의 자막도 읽지 않습니다.</p>
+    </section>
+
+    <footer>
+      <p class="disclaimer">
+        연구·접근성 소프트웨어이며 의료기기가 아닙니다. 진단이나 치료에 쓰지 마십시오.
+      </p>
+      <p id="model-state" class="state"></p>
+    </footer>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

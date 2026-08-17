@@ -98,6 +98,22 @@ jobs:
         if: always()
         run: python scripts/fetch_data.py list
 
+  extension:
+    name: browser extension invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      # No `npm install`: the extension has zero dependencies and runs on the Node
+      # built-in test runner. Nothing to install means nothing to keep pinned, and no
+      # build step between what is tested and what ships.
+      - name: Extension tests (permissions, token handling, cue ordering)
+        working-directory: extensions/audire-live
+        run: npm test
+
   security:
     name: dependency audit
     runs-on: ubuntu-latest

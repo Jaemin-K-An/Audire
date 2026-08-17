@@ -13,7 +13,7 @@ PORT ?= 8000
 .DEFAULT_GOAL := help
 .PHONY: help bootstrap lock data data-verify test test-fast lint typecheck audit \
         simulate eval eval-smoke caption-eval sensitivity model-compare validation-sweep live-ablation reproduce run e2e \
-        figures model live-model asr-eval smoke clean package check
+        figures model live-model asr-eval smoke clean package check test-extension
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -79,7 +79,10 @@ test: ## Full test suite with branch coverage on the core modules
 test-fast: ## Test suite without slow/asr/e2e markers
 	$(PYTEST) -m "not slow and not asr and not e2e"
 
-check: lint typecheck test ## Everything CI runs
+test-extension: ## Browser extension invariants (Node built-in runner, no dependencies)
+	cd extensions/audire-live && npm test
+
+check: lint typecheck test test-extension ## Everything CI runs
 
 # --------------------------------------------------------------------------- research
 
