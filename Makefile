@@ -13,7 +13,7 @@ PORT ?= 8000
 .DEFAULT_GOAL := help
 .PHONY: help bootstrap lock data data-verify test test-fast lint typecheck audit \
         simulate eval eval-smoke caption-eval sensitivity model-compare validation-sweep live-ablation reproduce run e2e \
-        figures model asr-eval smoke clean package check
+        figures model live-model asr-eval smoke clean package check
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -118,6 +118,9 @@ reproduce: ## Full research reproduction: eval -> sensitivity -> model-compare -
 	@echo "reproduction complete; see docs/RESULTS.md and experiments/artifacts/"
 
 # --------------------------------------------------------------------------- application
+
+live-model: ## Fit the live-caption-v1 artifact (browser DOM path, separate from media)
+	$(PYTHON) -c "from pathlib import Path; from audire.risk.artifact import fit_live_artifact; from audire.config.paths import private_dir; a=fit_live_artifact(Path('experiments/configs/live_model.yaml')); p,s=a.save(private_dir()/'models'/'audire-live-caption-v1.joblib'); print('wrote', p); print('wrote', s)"
 
 model: ## Fit the provenance-recorded synthetic deployment model into private/
 	$(PYTHON) -m audire.cli build-model --config experiments/configs/rq1_main.yaml

@@ -8,6 +8,7 @@ never a fallback to mock scores.
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from functools import lru_cache
@@ -16,6 +17,8 @@ from typing import Annotated, Any, Literal
 from uuid import uuid4
 
 from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
@@ -37,12 +40,15 @@ from audire.caption import (
     to_json,
     to_srt,
 )
+from audire.config.logging import get_logger
 from audire.config.paths import private_dir, repo_root
 from audire.confusion import CalibrationTrial, ConfusionProfile
 from audire.data.stimuli import Stimulus, build_balanced_catalog
 from audire.profile import HearingProfile, ProfileStore, ProfileStoreError, StoredProfile
 from audire.risk import WordScorer
-from audire.risk.artifact import DeploymentArtifact
+from audire.risk.artifact import DeploymentArtifact, ModelArtifactError
+
+log = get_logger(__name__)
 
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 SUPPORTED_MEDIA_SUFFIXES = frozenset({".wav", ".mp3", ".mp4", ".m4a", ".flac", ".ogg"})
@@ -53,6 +59,35 @@ def default_model_artifact_path() -> Path:
     if configured:
         return Path(configured).expanduser().resolve()
     return (private_dir() / "models" / "audire-logistic.joblib").resolve()
+
+
+def default_live_artifact_path() -> Path:
+    configured = os.environ.get("AUDIRE_LIVE_ARTIFACT")
+    if configured:
+        return Path(configured).expanduser().resolve()
+    return (private_dir() / "models" / "audire-live-caption-v1.joblib").resolve()
+
+
+def _load_live_scorer() -> Any:
+    """라이브 아티팩트를 계약 확인과 함께 읽습니다.
+
+    없거나 계약이 맞지 않으면 ``None`` 을 돌려주고, 라우트가 그 사실을 구분된 실패 상태로
+    보고합니다. 미디어 아티팩트를 대신 집어 드는 일은 로더가 막습니다.
+    """
+    from audire.live.contract import LIVE_CAPTION_V1, ContractViolation
+    from audire.live.service import LiveScorer
+
+    path = default_live_artifact_path()
+    if not path.exists():
+        return None
+    try:
+        artifact = DeploymentArtifact.load(path, expect_contract=LIVE_CAPTION_V1.version)
+        sidecar = json.loads(path.with_suffix(path.suffix + ".json").read_text(encoding="utf-8"))
+        metadata = {**artifact.metadata, "artifact_sha256": sidecar.get("artifact_sha256")}
+        return LiveScorer(scorer=artifact.scorer, artifact_metadata=metadata)
+    except (ModelArtifactError, ContractViolation, OSError, json.JSONDecodeError) as exc:
+        log.warning("live.artifact_unavailable", reason=type(exc).__name__)
+        return None
 
 
 def _load_default_scorer() -> WordScorer | None:
@@ -85,6 +120,9 @@ class AppServices:
     backend: ASRBackend
     scorer: WordScorer | None
     upload_dir: Path
+    #: 라이브 자막 경로용. 미디어 채점기와 **별도**입니다 — 두 경로는 볼 수 있는 정보가
+    #: 다르므로 아티팩트를 교차 사용할 수 없습니다(ADR-0021).
+    live_scorer: Any = None
 
 
 @lru_cache(maxsize=1)
@@ -133,6 +171,7 @@ def create_app(
     scorer: WordScorer | None = None,
     upload_dir: Path | None = None,
     auto_load_scorer: bool = True,
+    live_scorer: Any = None,
 ) -> FastAPI:
     """Build the application with overridable production services.
 
@@ -146,6 +185,9 @@ def create_app(
         backend=backend or FasterWhisperBackend(),
         scorer=scorer if scorer is not None or not auto_load_scorer else _load_default_scorer(),
         upload_dir=(upload_dir or (private_dir() / "uploads")).resolve(),
+        live_scorer=live_scorer
+        if live_scorer is not None or not auto_load_scorer
+        else _load_live_scorer(),
     )
     application = FastAPI(
         title="AUDIRE",
@@ -156,9 +198,40 @@ def create_app(
     )
     application.state.services = services
 
+    from audire.live.routes import ALLOWED_ORIGIN_SCHEMES, ALLOWED_ORIGINS, build_live_router
+
+    # CORS 를 좁힙니다. `*` 를 쓰면 같은 기기의 아무 페이지나 로컬 서버를 호출해 프로파일
+    # 목록을 읽을 수 있습니다. 확장 출처와 localhost 만 허용합니다.
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=(
+            r"^(chrome-extension|moz-extension)://[a-z0-9]+$"
+            r"|^http://(127\.0\.0\.1|localhost)(:\d+)?$"
+        ),
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+        allow_headers=["content-type", "x-audire-token"],
+    )
+    application.include_router(build_live_router())
+    _ = (ALLOWED_ORIGIN_SCHEMES, ALLOWED_ORIGINS)
+
     web_root = repo_root() / "apps" / "web"
     if web_root.exists():
         application.mount("/static", StaticFiles(directory=web_root), name="static")
+
+    @application.exception_handler(RequestValidationError)
+    async def validation_error(_request: Request, exc: RequestValidationError) -> JSONResponse:
+        """검증 오류에서 **입력값을 제거**합니다.
+
+        Pydantic 의 기본 응답은 위반한 값을 그대로 실어 보냅니다. 라이브 경로에서 그 값은
+        사용자가 보고 있던 자막이며, 이 저장소는 전사 텍스트를 민감 정보로 다룹니다.
+        오류를 진단하는 데 필요한 것은 어느 필드가 왜 틀렸는가이지 그 내용이 아닙니다.
+        """
+        stripped = [
+            {k: v for k, v in error.items() if k not in {"input", "ctx", "url"}}
+            for error in exc.errors()
+        ]
+        return JSONResponse(status_code=422, content={"detail": stripped})
 
     @application.exception_handler(ProfileStoreError)
     async def profile_store_error(_request: Request, exc: ProfileStoreError) -> JSONResponse:
