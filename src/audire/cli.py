@@ -225,6 +225,75 @@ def model_compare(config: ConfigOpt) -> None:
     typer.echo(f"\n단서: {head['caveat']}")
 
 
+@app.command("validation-sweep")
+def validation_sweep(config: ConfigOpt) -> None:
+    """E25 — 교정 길이 x SNR x 화자 x 하위군 x 예산 사전등록 검증 격자."""
+    from audire.experiments.validation_sweep import ValidationSweepConfig, run_validation_sweep
+
+    cfg = ValidationSweepConfig.load(config)
+    result = run_validation_sweep(cfg)
+    summary = result["summary"]
+    primary = f"{cfg.primary_budget:g}"
+
+    typer.echo(
+        f"\nrun_id: {result['run_id']}   선언 칸: {summary['headline']['n_declared_cells']}\n"
+    )
+    typer.echo("=== B1 교정 길이 (전체) ===")
+    typer.echo(
+        f"{'교정':>5s} {'PR-AUC':>8s} {'Brier':>8s} {'ECE':>7s} "
+        f"{f'재현율@{primary}':>11s} {'중앙값':>8s} {'최하위':>8s} {'거의0%':>8s} "
+        f"{'길이대비':>10s} {'이긴시드':>9s}"
+    )
+    typer.echo("-" * 100)
+    for e in summary["tables"]["overall"]:
+        typer.echo(
+            f"{e['calibration_length']:5d} {e['pr_auc']['mean']:8.4f} {e['brier']['mean']:8.4f} "
+            f"{e['ece']['mean']:7.4f} {e[f'recall@{primary}']['mean']:11.4f} "
+            f"{e['recall_median']['mean']:8.4f} {e['recall_worst']['mean']:8.4f} "
+            f"{e['frac_near_zero']['mean']:8.3f} "
+            f"{e['gain_over_word_length']['mean']:+10.4f} "
+            f"{e['n_seeds_beating_word_length']:4d}/{e['n_seeds']:<4d}"
+        )
+
+    for axis, label in (
+        ("snr_db", "B2 SNR"),
+        ("speaker", "B3 화자"),
+        ("severity", "B4 중증도"),
+        ("wrs_band", "B4 WRS"),
+        ("evidence_band", "B4 증거량"),
+        ("idiosyncrasy_band", "B4 정확도"),
+    ):
+        typer.echo(f"\n=== {label} ===")
+        typer.echo(
+            f"{'교정':>5s} {'조건':>12s} {'PR-AUC':>8s} {f'재현율@{primary}':>11s} "
+            f"{'길이대비':>10s} {'이긴시드':>9s}"
+        )
+        typer.echo("-" * 62)
+        for e in summary["tables"][axis]:
+            typer.echo(
+                f"{e['calibration_length']:5d} {e['slice_value']:>12s} {e['pr_auc']['mean']:8.4f} "
+                f"{e[f'recall@{primary}']['mean']:11.4f} "
+                f"{e['gain_over_word_length']['mean']:+10.4f} "
+                f"{e['n_seeds_beating_word_length']:4d}/{e['n_seeds']:<4d}"
+            )
+
+    h = summary["headline"]
+    typer.echo(
+        "\n모든 시드에서 단어길이를 이긴 최소 교정 길이: "
+        f"{h['min_calibration_beating_word_length_on_every_seed']}"
+    )
+    typer.echo(
+        f"예산에 따른 이득이 비단조인 조건 수: {h['n_budget_conditions_non_monotone']}"
+        f"/{len(h['budget_monotonicity'])}"
+    )
+    for r in h["budget_monotonicity"]:
+        gains = "  ".join(f"@{k} {v:+.4f}" for k, v in r["gains_by_budget"].items())
+        typer.echo(
+            f"  교정{r['calibration_length']:4d}  {gains}  단조={r['is_monotone_increasing']}"
+        )
+    typer.echo(f"\n단서: {h['caveat']}")
+
+
 @app.command("verify-runs")
 def verify_runs(
     run_id: Annotated[str | None, typer.Option("--run-id", help="기본값: 기록된 모든 실행")] = None,

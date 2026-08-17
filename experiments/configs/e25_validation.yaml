@@ -1,0 +1,39 @@
+# AUDIRE E25 — 사전등록 검증 격자 (Phase B: B1–B5).
+#
+# 교정 길이만 코호트 축입니다. SNR 과 화자는 시행 속성이므로 한 코호트가 모든 조건을 담고
+# 사후에 조각냅니다. 그래야 조건 간 비교가 **같은 청취자에 대해 짝지어지고**, 실제 배치
+# (여러 조건이 섞인 데이터로 학습 후 임의 조건에서 예측)와도 일치합니다.
+#
+# 선언된 칸이 하나라도 산출물에서 빠지면 실행이 실패합니다.
+
+name: e25_validation_sweep
+description: >-
+  개인화가 유용해지는 최소 교정 길이, 음향 조건과 화자에 대한 견고성, 하위군 붕괴 여부,
+  예산에 따른 이득의 단조성을 사전등록 격자로 확인합니다.
+
+base_simulation:
+  name: e25_cohort
+  seeds: [101, 202, 303, 404, 505]
+  n_listeners: 80
+  n_calibration_trials: 100   # calibration_lengths 로 덮어써집니다
+  n_word_trials: 250
+  snr_conditions_db: [20.0]   # snr_conditions_db 로 덮어써집니다
+  speakers: [male, female]
+
+# B1 — 개인화가 쓸모 있어지려면 교정이 얼마나 필요한가
+calibration_lengths: [10, 25, 50, 100, 200, 400]
+
+# B2 — 개인화 이득이 음향 조건에 따라 달라지는가
+snr_conditions_db: [20.0, 10.0, 5.0, 0.0, -5.0]
+
+arm: clinical_plus_confusion
+reference_arm: clinical
+model: logistic
+
+n_splits: 5
+n_bootstrap: 0
+ece_bins: 10
+
+# B5 — 예산에 따른 이득의 단조성
+budgets: [0.10, 0.20, 0.30, 0.50]
+primary_budget: 0.20
