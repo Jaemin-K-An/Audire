@@ -22,7 +22,9 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -108,22 +110,81 @@ def _subset(matrix: FeatureMatrix, idx: IntArray) -> FeatureMatrix:
     )
 
 
-def threshold_for_caption_rate(scores: FloatArray, target_rate: float) -> float:
-    """주어진 점수에서 목표 자막률을 내는 임계값.
+@dataclass(frozen=True, slots=True)
+class LiveThreshold:
+    """임계값과, 그 임계값에 정확히 걸린 동점 중 얼마를 통과시킬지.
+
+    왜 동점 비율이 필요한가
+    -----------------------
+    단어 특징만 쓰는 모델은 같은 단어에 같은 점수를 줍니다. 실측하면 16,000행에서 고유
+    점수가 33개뿐이고 훈련 행의 17.5% 가 임계값과 정확히 같습니다. 순수한 ``>= tau`` 는
+    그 덩어리를 통째로 넣거나 빼므로 어떤 임계값으로도 목표 자막률을 낼 수 없습니다.
+
+    이것은 비교만의 문제가 아닙니다. 사용자가 임계값 슬라이더를 움직여도 자막량이 계단식
+    으로만 변한다는 뜻이고, 라이브 제품에서 그대로 드러납니다.
+
+    큐 단위로 구현 가능한가
+    -----------------------
+    가능합니다. 경계에 걸린 항목은 ``(청취자, 단어)`` 의 결정적 해시로 통과 여부를 정하므로,
+    전체 후보 집합을 몰라도 한 큐 안에서 판정할 수 있습니다. 같은 청취자·같은 단어는 항상
+    같은 판정을 받아 화면이 깜빡이지 않습니다.
+    """
+
+    tau: float
+    #: 경계 동점 중 통과시킬 비율. 동점이 없으면 의미가 없습니다.
+    tie_pass_fraction: float
+
+
+def _tie_key(listener: str, index: int) -> float:
+    """경계 동점을 가르는 결정적 값 ``[0, 1)``.
+
+    ``hash()`` 는 프로세스마다 salt 가 달라 재현성을 깨므로 쓰지 않습니다.
+    """
+    digest = hashlib.blake2b(f"{listener}\x00{index}".encode(), digest_size=8).digest()
+    return int.from_bytes(digest, "big") / float(1 << 64)
+
+
+def select_with_threshold(
+    scores: FloatArray, groups: npt.NDArray[np.str_], threshold: LiveThreshold
+) -> npt.NDArray[np.bool_]:
+    """임계값 정책. 경계 동점은 결정적으로 분할합니다."""
+    chosen = scores > threshold.tau
+    boundary = np.isclose(scores, threshold.tau, rtol=0.0, atol=1e-12)
+    if boundary.any() and threshold.tie_pass_fraction > 0.0:
+        keys = np.array(
+            [_tie_key(str(groups[i]), int(i)) for i in np.flatnonzero(boundary)],
+            dtype=np.float64,
+        )
+        chosen[np.flatnonzero(boundary)] = keys < threshold.tie_pass_fraction
+    return chosen
+
+
+def threshold_for_caption_rate(scores: FloatArray, target_rate: float) -> LiveThreshold:
+    """목표 자막률을 내는 임계값과 경계 동점 통과 비율.
 
     **훈련 청취자의 점수만** 넘겨야 합니다. 홀드아웃 점수로 임계값을 고르면 그 순간
     비교가 무의미해집니다 — 호출자가 그 책임을 집니다.
     """
     if scores.size == 0:
         raise ValueError("빈 점수에서 임계값을 정할 수 없습니다")
-    # 상위 target_rate 비율이 선택되는 지점.
-    return float(np.quantile(scores, 1.0 - target_rate))
+    tau = float(np.quantile(scores, 1.0 - target_rate))
+    above = float(np.mean(scores > tau))
+    boundary = float(np.mean(np.isclose(scores, tau, rtol=0.0, atol=1e-12)))
+    if boundary <= 0.0:
+        return LiveThreshold(tau=tau, tie_pass_fraction=0.0)
+    # 엄격히 위쪽만으로는 부족한 만큼을 경계 덩어리에서 채웁니다.
+    needed = max(0.0, target_rate - above)
+    return LiveThreshold(tau=tau, tie_pass_fraction=min(1.0, needed / boundary))
 
 
 def threshold_metrics(
     y: IntArray, scores: FloatArray, groups: npt.NDArray[np.str_], threshold: float
 ) -> dict[str, float]:
-    """한 임계값에서의 자막률·재현율·정밀도와 청취자 간 분포."""
+    """한 임계값에서의 자막률·재현율·정밀도와 청취자 간 분포.
+
+    사전등록 격자용이므로 동점 분할 없이 순수한 ``>= tau`` 를 씁니다. 동일 자막률 비교는
+    :func:`threshold_for_caption_rate` 가 만든 :class:`LiveThreshold` 를 씁니다.
+    """
     selected = scores >= threshold
     n_positive = int(y.sum())
     hits = int((selected & (y == 1)).sum())
@@ -215,7 +276,7 @@ def evaluate_live_arm(
 
     folds = listener_folds(matrix.groups, matrix.y, n_splits=cfg.n_splits, stratify=True, seed=seed)
     oof = np.full(matrix.y.shape, np.nan, dtype=np.float64)
-    matched_threshold_by_fold: list[float] = []
+    matched_threshold_by_fold: list[dict[str, float]] = []
     matched_selected = np.zeros(matrix.y.shape, dtype=bool)
 
     for fold in folds:
@@ -227,9 +288,13 @@ def evaluate_live_arm(
 
         # 동일 자막률용 임계값: 훈련 청취자에 대한 **훈련된 모델의 예측**에서 찾습니다.
         train_scores = model.predict_proba(train)
-        tau = threshold_for_caption_rate(train_scores, cfg.matched_caption_rate)
-        matched_threshold_by_fold.append(tau)
-        matched_selected[fold.test_idx] = oof[fold.test_idx] >= tau
+        live_tau = threshold_for_caption_rate(train_scores, cfg.matched_caption_rate)
+        matched_threshold_by_fold.append(
+            {"tau": live_tau.tau, "tie_pass_fraction": live_tau.tie_pass_fraction}
+        )
+        matched_selected[fold.test_idx] = select_with_threshold(
+            oof[fold.test_idx], matrix.groups[fold.test_idx], live_tau
+        )
 
     if np.any(~np.isfinite(oof)):
         raise RuntimeError("일부 행이 폴드 밖 예측을 받지 못했습니다")
@@ -397,8 +462,10 @@ __all__ = [
     "LIVE_ARMS",
     "ContractViolation",
     "LiveAblationConfig",
+    "LiveThreshold",
     "evaluate_live_arm",
     "run_live_ablation",
+    "select_with_threshold",
     "threshold_for_caption_rate",
     "threshold_metrics",
 ]
