@@ -204,10 +204,26 @@ def test_confusion_features_on_a_non_hangul_token_are_neutral() -> None:
 # =========================================================== feature specs
 
 
-def test_every_arm_shares_the_word_and_context_blocks() -> None:
-    """Arms must differ only in the listener representation, or RQ1 is unanswerable."""
+def test_media_arms_share_the_word_and_context_blocks() -> None:
+    """RQ1 계열의 arm 은 청취자 표현에서만 달라야 비교가 성립합니다.
+
+    라이브 arm 은 이 규칙에서 의도적으로 제외됩니다. 브라우저 DOM 자막 모드에는 음향
+    맥락이 없으므로 `context` 블록을 아예 갖지 않으며, 그것이 `live-caption-v1` 계약의
+    핵심입니다(ADR-0021). 두 계열을 한 규칙으로 묶으면 그 구분이 사라집니다.
+    """
     for name, blocks in ABLATION_ARMS.items():
+        if name.startswith("live_"):
+            continue
         assert "word" in blocks and "context" in blocks, name
+
+
+def test_live_arms_share_the_word_block_but_never_context() -> None:
+    """라이브 계열도 단어 블록은 공유해야 arm 간 비교가 성립합니다."""
+    live = {n: b for n, b in ABLATION_ARMS.items() if n.startswith("live_")}
+    assert live, "라이브 arm 이 하나도 없습니다"
+    for name, blocks in live.items():
+        assert "word" in blocks, name
+        assert "context" not in blocks, name
 
 
 def test_arm_requiring_a_profile_refuses_to_run_without_one() -> None:
