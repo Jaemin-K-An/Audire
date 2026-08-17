@@ -1,0 +1,40 @@
+# AUDIRE E30 — 라이브 자막 입력 계약 절제 (Phase 4).
+#
+# 묻는 것: 음향 맥락이 없을 때, 청취자별 임상·혼동 정보가 단어 정보만으로 얻는 것 위에
+# 홀드아웃 가치를 더하는가?
+#
+# 라이브 arm 은 context 블록을 아예 포함하지 않습니다. 전체 행렬을 만든 뒤 c_snr_db 를
+# 지우는 방식이 아니며, 학습과 추론이 같은 정보 제약 아래에 있습니다(ADR-0021).
+#
+# 진단 arm(clinical_plus_confusion)은 계약 불일치·분포 밖 사용이므로 제품 후보가 아닙니다.
+# 기존 모델이 음향 입력을 잃었을 때 얼마나 달라지는지 재는 용도로만 둡니다.
+
+name: e30_live_contract
+description: >-
+  브라우저 DOM 자막만 볼 때 정직하게 쓸 수 있는 특징으로 로지스틱을 다시 적합하고,
+  단어 정보만 / +임상 / +혼동 세 arm 을 동일 자막률과 확률 품질에서 비교합니다.
+
+simulation:
+  name: e30_cohort
+  seeds: [101, 202, 303, 404, 505]
+  n_listeners: 80
+  n_calibration_trials: 100
+  n_word_trials: 250
+  snr_conditions_db: [20.0, 10.0, 5.0, 0.0, -5.0]
+  speakers: [male, female]
+
+live_arms:
+  - live_word_context                       # LIVE-0
+  - live_word_context_clinical              # LIVE-1
+  - live_word_context_clinical_confusion    # LIVE-2
+
+include_legacy_diagnostic: true
+model: logistic
+n_splits: 5
+ece_bins: 10
+
+thresholds: [0.30, 0.40, 0.50, 0.60, 0.70]
+budgets: [0.10, 0.20, 0.30, 0.50]
+
+matched_caption_rate: 0.20
+caption_rate_tolerance: 0.02

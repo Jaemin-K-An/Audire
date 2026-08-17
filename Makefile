@@ -12,7 +12,7 @@ PORT ?= 8000
 
 .DEFAULT_GOAL := help
 .PHONY: help bootstrap lock data data-verify test test-fast lint typecheck audit \
-        simulate eval eval-smoke caption-eval sensitivity model-compare validation-sweep reproduce run e2e \
+        simulate eval eval-smoke caption-eval sensitivity model-compare validation-sweep live-ablation reproduce run e2e \
         figures model asr-eval smoke clean package check
 
 help: ## Show this help
@@ -97,6 +97,9 @@ caption-eval: ## RQ2/RQ3 — caption budget Pareto frontier and personalized thr
 
 sensitivity: ## E11 — idiosyncrasy x calibration-length sweep
 	$(PYTHON) -m audire.cli sensitivity --config experiments/configs/sensitivity.yaml
+
+live-ablation: ## E30 — live-caption input contract ablation (LIVE-0/1/2 + diagnostic)
+	$(PYTHON) -m audire.cli live-ablation --config experiments/configs/e30_live_contract.yaml
 
 validation-sweep: ## E25 — calibration-length x SNR x speaker x subgroup x budget grid
 	$(PYTHON) -m audire.cli validation-sweep --config experiments/configs/e25_validation.yaml

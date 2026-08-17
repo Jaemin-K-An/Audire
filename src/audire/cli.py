@@ -225,6 +225,44 @@ def model_compare(config: ConfigOpt) -> None:
     typer.echo(f"\n단서: {head['caveat']}")
 
 
+@app.command("live-ablation")
+def live_ablation(config: ConfigOpt) -> None:
+    """E30 — 라이브 자막 입력 계약 절제 (LIVE-0/1/2 + 진단 대조)."""
+    from audire.experiments.live_ablation import LiveAblationConfig, run_live_ablation
+
+    cfg = LiveAblationConfig.load(config)
+    result = run_live_ablation(cfg)
+    summary = result["summary"]
+
+    typer.echo(f"\nrun_id: {result['run_id']}   시드: {summary['seeds']}\n")
+    typer.echo(
+        f"{'arm':40s} {'역할':10s} {'열':>4s} {'PR-AUC':>8s} {'Brier':>8s} {'ECE':>7s} "
+        f"{'재현율@0.2':>10s} {'동일률재현':>10s} {'달성률':>8s} {'최하위':>8s}"
+    )
+    typer.echo("-" * 122)
+    for row in summary["table"]:
+        typer.echo(
+            f"{row['arm']:40s} {row['role']:10s} {row['n_features']:4d} "
+            f"{row['pr_auc']['mean']:8.4f} {row['brier']['mean']:8.4f} {row['ece']['mean']:7.4f} "
+            f"{row['recall@0.2']['mean']:10.4f} {row['matched_recall']['mean']:10.4f} "
+            f"{row['matched_caption_rate']['mean']:8.4f} "
+            f"{row['matched_recall_worst']['mean']:8.4f}"
+        )
+
+    head = summary["headline"]
+    typer.echo(
+        f"\n동일 자막률 목표 {head['matched_caption_rate_target']:.2f} 이 "
+        f"허용오차 안에서 맞았는가: {head['caption_rate_matched_within_tolerance']}"
+    )
+    typer.echo("\n짝지은 시드별 대조 (동일 자막률에서의 오청 재현율):")
+    for c in head["contrasts"]:
+        typer.echo(
+            f"  {c['contrast']:78s} {c['mean']:+.5f} +-{c['sd']:.5f}  "
+            f"{c['n_seeds_positive']}/{c['n_seeds']} 시드 양수"
+        )
+    typer.echo(f"\n단서: {head['caveat']}")
+
+
 @app.command("validation-sweep")
 def validation_sweep(config: ConfigOpt) -> None:
     """E25 — 교정 길이 x SNR x 화자 x 하위군 x 예산 사전등록 검증 격자."""
