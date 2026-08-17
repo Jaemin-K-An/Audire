@@ -2,6 +2,7 @@
 
 from audire.risk.advanced import (
     CrossFittedResidualRiskModel,
+    ListenerPairwiseLogisticRanker,
     ListenerRankingModel,
     ResidualRiskModel,
     SplineAdditiveRiskModel,
@@ -64,6 +65,7 @@ __all__ = [
     "FeatureSpec",
     "GradientBoostedRiskModel",
     "GroupPrior",
+    "ListenerPairwiseLogisticRanker",
     "ListenerRankingModel",
     "LogisticRiskModel",
     "PhonemeIndependenceRisk",

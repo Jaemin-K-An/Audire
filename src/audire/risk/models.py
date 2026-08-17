@@ -293,6 +293,7 @@ MODEL_REGISTRY: dict[str, type[RiskModel]] = {
 _LAZY_MODELS: dict[str, str] = {
     "residual": "ResidualRiskModel",
     "cross_fitted_residual": "CrossFittedResidualRiskModel",
+    "pairwise_logistic": "ListenerPairwiseLogisticRanker",
     "spline_gam": "SplineAdditiveRiskModel",
     "lambdamart": "ListenerRankingModel",
 }

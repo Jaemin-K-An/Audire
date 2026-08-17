@@ -602,3 +602,192 @@ class CrossFittedResidualRiskModel(RiskModel):
         if self.is_fitted:
             out["residual_strength"] = self.residual_strength()
         return out
+
+
+@dataclass
+class ListenerPairwiseLogisticRanker(RiskModel):
+    """Phase F — 청취자 **안에서** 단어 쌍을 비교하도록 학습하는 선형 랭커.
+
+    왜 이 모델인가
+    --------------
+    선택 자막은 청취자별 예산 안에서의 **순위** 문제입니다. 그런데 지금까지의 결과는 일관되게
+    선형 모델을 선호했고(E22), 순위를 직접 최적화한 LambdaMART 는 크게 뒤졌습니다. 이 모델은
+    두 성질을 합칩니다: 선형·해석 가능하면서 목적함수가 청취자 내 순서입니다.
+
+    청취자 상수가 소거됩니다
+    ------------------------
+    한 청취자 안에서 오청 단어 A 와 정청 단어 B 를 짝지어 ``ΔX = X_A - X_B`` 를 만들면,
+    청취자에 대해 상수인 열(PTA, WRS, SRT 등)은 정확히 0 이 됩니다. 모델은 그 열들로부터
+    아무것도 배울 수 없고, **단어 사이의 차이**만 배우게 됩니다. E25 에서 전체 이득의
+    대부분이 조건 배분에서 왔고 조건 내부 이득이 1/10 이었던 것을 생각하면, 이 소거는
+    바로 그 지점을 겨냥합니다.
+
+    쌍 개수는 반드시 유계여야 합니다
+    --------------------------------
+    청취자 한 명의 오청 m 개와 정청 n 개는 m×n 쌍을 만듭니다. 250 시행에서 이는 쉽게
+    15,000 쌍이 되고 코호트 전체로는 백만 단위가 됩니다. ``max_pairs_per_listener`` 로
+    상한을 두고, 초과하면 **시드로 결정되는** 표집을 합니다.
+
+    출력은 확률이 아닙니다
+    ----------------------
+    쌍별 목적으로 학습한 점수는 순서만 의미가 있습니다. :meth:`predict_proba` 는 인터페이스를
+    맞추기 위한 단조 변환일 뿐이며, ``describe()`` 가 ``output_is_probability: False`` 를
+    보고합니다. 임계값 정책이 소비하기 전에 청취자 홀드아웃 데이터에서 교정해야 합니다.
+    """
+
+    name: str = "pairwise_logistic"
+    C: float = 1.0
+    max_iter: int = 2000
+    random_state: int = 0
+    #: 청취자당 쌍 상한. None 이면 모든 쌍(작은 코호트에서만 현실적).
+    max_pairs_per_listener: int | None = 400
+    #: ``"random"`` 은 균등 표집, ``"hard"`` 는 기저 위험이 비슷한 쌍을 우선합니다.
+    pair_sampling: str = "random"
+    _pipeline: Pipeline | None = None
+    feature_names: tuple[str, ...] = ()
+    n_train: int = 0
+    n_pairs: int = 0
+    n_listeners_with_pairs: int = 0
+    #: 훈련 점수의 위치와 척도. 단조 변환이 포화되지 않게 하는 데만 쓰이며 순서를 바꾸지
+    #: 않습니다. 훈련 데이터에서만 계산되므로 홀드아웃 정보가 들어가지 않습니다.
+    _score_centre: float = 0.0
+    _score_scale: float = 1.0
+
+    def _pairs_for(
+        self, y: npt.NDArray[np.int64], rng: np.random.Generator
+    ) -> list[tuple[int, int]]:
+        """한 청취자 안의 (오청, 정청) 인덱스 쌍. 결정적으로 표집됩니다."""
+        positive = np.flatnonzero(y == 1)
+        negative = np.flatnonzero(y == 0)
+        if positive.size == 0 or negative.size == 0:
+            return []
+        total = positive.size * negative.size
+        cap = self.max_pairs_per_listener
+        if cap is None or total <= cap:
+            return [(int(a), int(b)) for a in positive for b in negative]
+        # 곱집합을 만들지 않고 인덱스를 직접 뽑습니다. m×n 을 실체화하면 메모리가 터집니다.
+        picks = rng.choice(total, size=cap, replace=False)
+        return [
+            (int(positive[p // negative.size]), int(negative[p % negative.size])) for p in picks
+        ]
+
+    def fit(self, matrix: FeatureMatrix) -> ListenerPairwiseLogisticRanker:
+        if matrix.y is None:
+            raise ValueError("cannot fit without labels")
+        y = matrix.y
+        if np.unique(y).size < 2:
+            raise ValueError("training data has a single class; a ranker cannot be fitted")
+
+        rng = np.random.default_rng(self.random_state)
+        deltas: list[FloatArray] = []
+        n_with_pairs = 0
+        # 청취자를 정렬해 순회합니다. 순회 순서가 난수 스트림을 통해 결과에 새어들지
+        # 않도록 하기 위한 것입니다.
+        for listener in sorted(set(matrix.groups.tolist())):
+            mask = matrix.groups == listener
+            rows = np.flatnonzero(mask)
+            pairs = self._pairs_for(y[mask], rng)
+            if not pairs:
+                continue
+            n_with_pairs += 1
+            local = matrix.X[rows]
+            for a, b in pairs:
+                deltas.append(local[a] - local[b])
+
+        if not deltas:
+            raise ValueError(
+                "쌍을 하나도 만들지 못했습니다; 어떤 청취자도 오청과 정청을 모두 갖지 않았습니다"
+            )
+
+        # 대칭 학습: ΔX -> 1, -ΔX -> 0. 절편을 두지 않아야 "A 가 B 보다 위험하다" 가
+        # 방향에 대해 대칭이 됩니다.
+        delta = np.asarray(deltas, dtype=np.float64)
+        x = np.vstack([delta, -delta])
+        labels = np.concatenate(
+            [np.ones(len(delta), dtype=np.int64), np.zeros(len(delta), dtype=np.int64)]
+        )
+
+        self._pipeline = Pipeline(
+            [
+                ("impute", SimpleImputer(strategy="median", keep_empty_features=True)),
+                ("scale", StandardScaler(with_mean=False)),
+                (
+                    "clf",
+                    LogisticRegression(
+                        C=self.C,
+                        l1_ratio=0.0,
+                        max_iter=self.max_iter,
+                        random_state=self.random_state,
+                        solver="lbfgs",
+                        fit_intercept=False,
+                    ),
+                ),
+            ]
+        )
+        self._pipeline.fit(x, labels)
+        self.feature_names = matrix.feature_names
+        self.n_train = len(matrix)
+        self.n_pairs = len(delta)
+        self.n_listeners_with_pairs = n_with_pairs
+
+        # 원 점수의 위치와 척도를 훈련 데이터에서 기록합니다.
+        #
+        # 절편이 없고 109개 계수가 더해지므로 원 점수는 60~70 대에 놓입니다. 그대로
+        # 로지스틱으로 누르면 모든 행이 정확히 1.0 으로 포화되어 **순위가 통째로
+        # 사라집니다** — 예산 정책이 predict_proba 를 소비하므로 치명적입니다. 아핀
+        # 변환이라 순서는 정확히 보존되고, 통계는 훈련 행에서만 계산되므로 홀드아웃
+        # 정보가 들어가지 않습니다.
+        raw = self.predict_score(matrix)
+        self._score_centre = float(np.mean(raw))
+        scale = float(np.std(raw))
+        self._score_scale = scale if scale > 1e-12 else 1.0
+        return self
+
+    def predict_score(self, matrix: FeatureMatrix) -> FloatArray:
+        """원 순위 점수. **청취자 안에서만** 비교 가능합니다."""
+        if self._pipeline is None:
+            raise ValueError("pairwise ranker is not fitted")
+        if matrix.feature_names != self.feature_names:
+            raise ValueError("feature columns changed between fit and predict")
+        # 쌍 모델의 계수를 원 특징에 그대로 적용합니다. 학습이 ΔX 위에서 이루어졌으므로
+        # 같은 청취자 두 행의 점수 차이가 곧 그 쌍에 대한 모델의 판단입니다.
+        steps = self._pipeline
+        z = steps.named_steps["scale"].transform(steps.named_steps["impute"].transform(matrix.X))
+        out: FloatArray = z @ steps.named_steps["clf"].coef_.ravel()
+        return out
+
+    def predict_proba(self, matrix: FeatureMatrix) -> FloatArray:
+        """순위 점수의 단조 변환. **교정된 확률이 아닙니다.**
+
+        쌍별 목적으로 학습했으므로 절대 수준에는 의미가 없고 순서만 의미가 있습니다.
+        임계값 정책이 쓰려면 청취자 홀드아웃 데이터에서 교정해야 합니다.
+
+        훈련 점수의 위치·척도로 표준화한 뒤 누릅니다. 아핀 변환이므로 순서는 정확히
+        보존되며, 이것이 없으면 점수가 60 대라 모든 값이 1.0 으로 포화되어 순위가
+        사라집니다.
+        """
+        z = (self.predict_score(matrix) - self._score_centre) / self._score_scale
+        out: FloatArray = 1.0 / (1.0 + np.exp(-z))
+        return out
+
+    @property
+    def is_fitted(self) -> bool:
+        return self._pipeline is not None
+
+    def describe(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "family": "listener_pairwise_logistic",
+            "model_version": MODEL_VERSION,
+            "fitted": self.is_fitted,
+            "n_train": self.n_train,
+            "n_pairs": self.n_pairs,
+            "n_listeners_with_pairs": self.n_listeners_with_pairs,
+            "max_pairs_per_listener": self.max_pairs_per_listener,
+            "pair_sampling": self.pair_sampling,
+            "output_is_probability": False,
+            "note": (
+                "청취자 내 순위 점수입니다. 임계값 정책이 소비하기 전에 청취자 홀드아웃 "
+                "데이터에서 교정해야 하며, 교정 없이 Brier/ECE 를 읽으면 안 됩니다."
+            ),
+        }

@@ -22,8 +22,10 @@ from audire.eval.ablation import cohort_matrix
 from audire.eval.splits import listener_folds
 from audire.risk import (
     CalibratedRiskModel,
+    CrossFittedResidualRiskModel,
     FeatureMatrix,
     FeatureSpec,
+    ListenerPairwiseLogisticRanker,
     ListenerRankingModel,
     LogisticRiskModel,
     ResidualRiskModel,
@@ -382,3 +384,242 @@ def test_models_never_see_the_held_out_listeners(matrix, name):
     model = make_model(name, **kwargs).fit(train)
     assert model.describe()["n_train"] == fold.n_train
     assert set(train.groups.tolist()) == set(fold.train_listeners)
+
+
+# ============================================ Phase E — 교차적합 잔차 (누출 방지가 핵심)
+
+
+def test_cross_fitted_residual_is_registered():
+    assert "cross_fitted_residual" in known_models()
+    assert make_model("cross_fitted_residual").name == "cross_fitted_residual"
+
+
+def test_cross_fitted_residual_refuses_an_arm_without_personal_features(cohort):
+    plain = cohort_matrix(cohort, FeatureSpec.arm("word_context_only", speakers=SPEAKERS))
+    with pytest.raises(ValueError, match="개인 혼동 특징"):
+        CrossFittedResidualRiskModel().fit(plain)
+
+
+def test_every_training_row_receives_an_out_of_fold_base_prediction(split, monkeypatch):
+    """미션 요구사항.
+
+    잔차가 표본 안(in-sample) 기저 예측 위에서 적합되면, 그것은 "이 청취자가 이 단어를
+    유난히 어려워하는가" 가 아니라 "기저 모델이 자기 훈련 데이터에서 어디를 과신했는가" 를
+    배웁니다. 그 보정은 홀드아웃 청취자에게 옮겨지지 않습니다.
+    """
+    train, _ = split
+    seen: dict[str, set[str]] = {}
+
+    from audire.eval import splits as splits_mod
+
+    real = splits_mod.listener_folds
+
+    def spy(groups, y=None, **kw):
+        folds = real(groups, y, **kw)
+        for fold in folds:
+            seen.setdefault("train", set()).update(fold.train_listeners)
+            seen.setdefault("test", set()).update(fold.test_listeners)
+            # 핵심: 내부 폴드에서도 청취자가 양쪽에 걸치지 않아야 합니다.
+            assert not (set(fold.train_listeners) & set(fold.test_listeners))
+        return folds
+
+    monkeypatch.setattr("audire.eval.splits.listener_folds", spy)
+    model = CrossFittedResidualRiskModel(n_inner_splits=3).fit(train)
+
+    assert model.n_inner_folds_used == 3
+    # 모든 훈련 청취자가 어느 내부 폴드에선가 검증 쪽에 서야 폴드 밖 예측을 받습니다.
+    assert seen["test"] == set(train.groups.tolist())
+
+
+def test_inner_folds_never_use_the_outer_held_out_listeners(matrix):
+    """바깥 홀드아웃 청취자는 기저 학습·잔차 학습·전처리 어디에도 들어가면 안 됩니다."""
+    fold = listener_folds(matrix.groups, matrix.y, n_splits=4, stratify=True, seed=0)[0]
+    train = _subset(matrix, fold.train_idx)
+    model = CrossFittedResidualRiskModel(n_inner_splits=3).fit(train)
+
+    assert model.n_train == fold.n_train
+    assert set(train.groups.tolist()) == set(fold.train_listeners)
+    assert not (set(train.groups.tolist()) & set(fold.test_listeners))
+
+
+def test_cross_fitting_needs_at_least_two_training_listeners(split):
+    train, _ = split
+    one = train.groups[0]
+    mask = train.groups == one
+    single = _subset(train, np.flatnonzero(mask))
+    with pytest.raises(ValueError, match="최소 2명"):
+        CrossFittedResidualRiskModel().fit(single)
+
+
+def test_inner_fold_count_is_reported_when_it_shrinks(split):
+    """청취자가 적어 내부 폴드가 줄면 조용히 넘어가지 않고 기록되어야 합니다."""
+    train, _ = split
+    n_listeners = int(np.unique(train.groups).size)
+    model = CrossFittedResidualRiskModel(n_inner_splits=n_listeners + 10).fit(train)
+    described = model.describe()
+    assert described["n_inner_splits_requested"] == n_listeners + 10
+    assert described["n_inner_folds_used"] <= n_listeners
+
+
+def test_cross_fitted_differs_from_the_in_sample_residual(split):
+    """두 모델이 같은 예측을 낸다면 교차적합이 아무 일도 하지 않은 것입니다."""
+    train, test = split
+    plain = ResidualRiskModel().fit(train).predict_proba(test)
+    crossed = CrossFittedResidualRiskModel().fit(train).predict_proba(test)
+    assert not np.allclose(plain, crossed)
+
+
+def test_cross_fitted_residual_strength_is_reported(split):
+    train, _ = split
+    model = CrossFittedResidualRiskModel().fit(train)
+    assert "residual_strength" in model.describe()
+    assert model.residual_strength() >= 0.0
+
+
+def test_cross_fitted_feature_columns_stay_stable(split):
+    train, test = split
+    model = CrossFittedResidualRiskModel().fit(train)
+    renamed = FeatureMatrix(
+        X=test.X,
+        feature_names=("bogus", *test.feature_names[1:]),
+        groups=test.groups,
+        y=test.y,
+        meta=test.meta,
+    )
+    with pytest.raises(ValueError, match="feature columns changed"):
+        model.predict_proba(renamed)
+
+
+def test_cross_fitted_is_deterministic(split):
+    train, test = split
+    a = CrossFittedResidualRiskModel(random_state=0).fit(train).predict_proba(test)
+    b = CrossFittedResidualRiskModel(random_state=0).fit(train).predict_proba(test)
+    assert np.array_equal(a, b)
+
+
+def test_cross_fitted_preprocessing_is_fitted_on_training_rows_only(split):
+    train, test = split
+    model = CrossFittedResidualRiskModel().fit(train)
+    before = model.predict_proba(train)
+    model.predict_proba(_replace_x(test, test.X * 1e6 + 1e6))
+    assert np.array_equal(before, model.predict_proba(train))
+
+
+# ================================================ Phase F — 청취자 쌍별 로지스틱 랭커
+
+
+def test_pairwise_ranker_is_registered():
+    assert "pairwise_logistic" in known_models()
+    assert make_model("pairwise_logistic").name == "pairwise_logistic"
+
+
+def test_listener_constant_columns_cancel_in_the_pairs(split):
+    """이 모델의 존재 이유.
+
+    한 청취자 안에서 ΔX 를 만들면 PTA·WRS·SRT 처럼 청취자에 대해 상수인 열이 정확히 0 이
+    됩니다. 모델은 그 열들로부터 아무것도 배울 수 없고 단어 사이의 차이만 배웁니다.
+    """
+    train, _ = split
+    listener = train.groups[0]
+    rows = np.flatnonzero(train.groups == listener)
+    assert rows.size >= 2
+    clinical = [i for i, n in enumerate(train.feature_names) if n.startswith("h_")]
+    assert clinical, "임상 열이 있어야 이 검사가 의미를 갖습니다"
+    delta = train.X[rows[0]] - train.X[rows[1]]
+    assert np.max(np.abs(delta[clinical])) == 0.0
+
+
+def test_pairs_are_built_within_listeners_only(split):
+    """쌍이 청취자를 넘으면 그 순간 청취자 수준 일반화 주장이 무너집니다."""
+    train, _ = split
+    model = ListenerPairwiseLogisticRanker(max_pairs_per_listener=50)
+    rng = np.random.default_rng(0)
+    for listener in sorted(set(train.groups.tolist())):
+        mask = train.groups == listener
+        pairs = model._pairs_for(train.y[mask], rng)
+        local_y = train.y[mask]
+        for a, b in pairs:
+            # 인덱스는 이 청취자의 지역 인덱스이며, 라벨이 (오청, 정청) 이어야 합니다.
+            assert local_y[a] == 1
+            assert local_y[b] == 0
+
+
+def test_pair_count_is_bounded(split):
+    """m×n 쌍을 무제한으로 만들면 코호트 전체가 백만 단위가 됩니다."""
+    train, _ = split
+    cap = 25
+    model = ListenerPairwiseLogisticRanker(max_pairs_per_listener=cap).fit(train)
+    assert model.n_pairs <= cap * model.n_listeners_with_pairs
+
+
+def test_pair_sampling_is_deterministic_under_a_seed(split):
+    train, test = split
+    a = ListenerPairwiseLogisticRanker(max_pairs_per_listener=40, random_state=0).fit(train)
+    b = ListenerPairwiseLogisticRanker(max_pairs_per_listener=40, random_state=0).fit(train)
+    assert a.n_pairs == b.n_pairs
+    assert np.array_equal(a.predict_score(test), b.predict_score(test))
+
+
+def test_different_seeds_sample_different_pairs(split):
+    train, _ = split
+    a = ListenerPairwiseLogisticRanker(max_pairs_per_listener=40, random_state=0).fit(train)
+    b = ListenerPairwiseLogisticRanker(max_pairs_per_listener=40, random_state=7).fit(train)
+    # 쌍 수는 같아도 내용이 달라 계수가 달라져야 표집이 실제로 일어난 것입니다.
+    assert not np.array_equal(
+        a._pipeline.named_steps["clf"].coef_, b._pipeline.named_steps["clf"].coef_
+    )
+
+
+def test_uncapped_pairs_are_the_full_product(split):
+    train, _ = split
+    model = ListenerPairwiseLogisticRanker(max_pairs_per_listener=None)
+    rng = np.random.default_rng(0)
+    listener = sorted(set(train.groups.tolist()))[0]
+    y = train.y[train.groups == listener]
+    expected = int((y == 1).sum()) * int((y == 0).sum())
+    assert len(model._pairs_for(y, rng)) == expected
+
+
+def test_pairwise_score_is_not_advertised_as_a_probability(split):
+    train, _test = split
+    described = ListenerPairwiseLogisticRanker(max_pairs_per_listener=50).fit(train).describe()
+    assert described["output_is_probability"] is False
+    assert "교정" in described["note"]
+
+
+def test_pairwise_proba_preserves_the_score_ordering(split):
+    train, test = split
+    model = ListenerPairwiseLogisticRanker(max_pairs_per_listener=50).fit(train)
+    assert np.array_equal(
+        np.argsort(model.predict_score(test)), np.argsort(model.predict_proba(test))
+    )
+
+
+def test_pairwise_score_is_invariant_to_input_row_order(split):
+    """평가 행의 순서가 점수를 바꾸면 예산 선택이 재현되지 않습니다."""
+    train, test = split
+    model = ListenerPairwiseLogisticRanker(max_pairs_per_listener=50).fit(train)
+    order = np.random.default_rng(3).permutation(len(test))
+    shuffled = _subset(test, order)
+    assert np.allclose(model.predict_score(test)[order], model.predict_score(shuffled))
+
+
+def test_pairwise_refuses_when_no_listener_has_both_classes(split):
+    train, _ = split
+    all_positive = FeatureMatrix(
+        X=train.X,
+        feature_names=train.feature_names,
+        groups=train.groups,
+        y=np.ones_like(train.y),
+        meta=train.meta,
+    )
+    with pytest.raises(ValueError, match="single class"):
+        ListenerPairwiseLogisticRanker().fit(all_positive)
+
+
+def test_pairwise_never_sees_the_held_out_listeners(matrix):
+    fold = listener_folds(matrix.groups, matrix.y, n_splits=4, stratify=True, seed=0)[0]
+    train = _subset(matrix, fold.train_idx)
+    model = ListenerPairwiseLogisticRanker(max_pairs_per_listener=30).fit(train)
+    assert model.n_train == fold.n_train
+    assert model.n_listeners_with_pairs <= len(fold.train_listeners)
