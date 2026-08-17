@@ -139,11 +139,18 @@ def listener_subgroups(cohort: Cohort) -> dict[str, dict[str, str]]:
         out[record.listener_id] = {
             "severity": record.listener.stratum,
             "wrs_band": _band(wrs, (60.0, 80.0), ("wrs_low", "wrs_mid", "wrs_high")),
-            # coverage 는 위치별 사전 관측 비율의 사전이므로 평균을 씁니다.
+            # 사용 가능한 증거의 **비율**로 나눕니다. coverage 로 나누면 안 됩니다.
+            #
+            # 측정해 보면 coverage·n_trials·total_observations 는 청취자 간 분산이 정확히
+            # 0 입니다. 교정 자극 목록이 결정론적이고 균형 잡혀 있어 모든 청취자가 같은
+            # 자극을 받기 때문입니다. 즉 coverage 는 교정 **길이**의 함수일 뿐이고, 그것은
+            # 이미 B1 축입니다. 그 값으로 하위군을 나누면 모두가 한 칸에 들어가 축이
+            # 아무것도 구분하지 못합니다. 실제로 청취자마다 다른 것은 응답 불능 횟수이며,
+            # 그것이 "이 프로파일이 실제로 얼마나 쓸 만한 증거를 담고 있는가" 입니다.
             "evidence_band": _band(
-                float(np.mean(list(confusion.coverage.values()))),
-                (0.25, 0.55),
-                ("cov_low", "cov_mid", "cov_high"),
+                1.0 - (confusion.n_unusable_responses / max(confusion.n_trials, 1)),
+                (0.95, 0.99),
+                ("usable_low", "usable_mid", "usable_high"),
             ),
             # 증거가 전혀 없으면 None 이며, _band 가 "unknown" 으로 남깁니다.
             "idiosyncrasy_band": _band(
@@ -406,6 +413,28 @@ def _agg(values: Sequence[float]) -> dict[str, float]:
     }
 
 
+def _within_snr_monotonicity(
+    snr_rows: list[dict[str, Any]], budgets_sorted: list[float]
+) -> list[dict[str, Any]]:
+    """조건을 고정했을 때도 예산에 따른 이득이 단조인가.
+
+    전체 슬라이스가 단조여도 조건 내부는 그렇지 않을 수 있습니다. 조건 간 예산 배분
+    효과가 전체에서는 단조성을 매끄럽게 만들기 때문입니다.
+    """
+    out: list[dict[str, Any]] = []
+    for e in snr_rows:
+        seq = [e[f"gain@{b:g}"]["mean"] for b in budgets_sorted]
+        out.append(
+            {
+                "calibration_length": e["calibration_length"],
+                "snr_db": e["slice_value"],
+                "gains_by_budget": dict(zip([f"{b:g}" for b in budgets_sorted], seq, strict=True)),
+                "is_monotone_increasing": all(b >= a - 1e-12 for a, b in pairwise(seq)),
+            }
+        )
+    return out
+
+
 def _summarise(cfg: ValidationSweepConfig, rows: list[dict[str, Any]]) -> dict[str, Any]:
     primary = f"{cfg.primary_budget:g}"
     gain_key, recall_key = f"gain@{primary}", f"recall@{primary}"
@@ -474,8 +503,29 @@ def _summarise(cfg: ValidationSweepConfig, rows: list[dict[str, Any]]) -> dict[s
             }
         )
 
+    # 전체 이득과 **조건 내부** 이득을 나란히 둡니다.
+    #
+    # 청취자별 예산은 그 청취자의 모든 단어에서 상위 k%를 고릅니다. SNR 이 섞여 있으면
+    # 모델은 예산을 어려운 조건 쪽으로 몰아줄 수 있고, 단어길이 휴리스틱은 그럴 수
+    # 없습니다. 그래서 전체 이득에는 "이 단어가 이 사람에게 어렵다" 뿐 아니라 "이 조건이
+    # 어렵다" 가 섞입니다. 조건을 고정한 뒤 남는 이득이 실제 단어 수준 개인화의 몫입니다.
+    by_length: dict[int, list[float]] = {}
+    for e in tables["snr_db"]:
+        by_length.setdefault(e["calibration_length"], []).append(e["gain_over_word_length"]["mean"])
+    within_condition = [
+        {
+            "calibration_length": e["calibration_length"],
+            "gain_overall": e["gain_over_word_length"]["mean"],
+            "gain_within_condition_mean": float(np.mean(by_length[e["calibration_length"]])),
+            "gain_within_condition_min": float(np.min(by_length[e["calibration_length"]])),
+        }
+        for e in overall
+        if e["calibration_length"] in by_length
+    ]
+
     headline: dict[str, Any] = {
         "primary_budget": cfg.primary_budget,
+        "overall_vs_within_condition_gain": within_condition,
         "n_declared_cells": cfg.n_cells,
         "calibration_lengths": cfg.calibration_lengths,
         "snr_conditions_db": cfg.snr_conditions_db,
@@ -483,6 +533,9 @@ def _summarise(cfg: ValidationSweepConfig, rows: list[dict[str, Any]]) -> dict[s
         "budget_monotonicity": monotone_rows,
         "n_budget_conditions_non_monotone": sum(
             1 for r in monotone_rows if not r["is_monotone_increasing"]
+        ),
+        "budget_monotonicity_within_snr": _within_snr_monotonicity(
+            tables["snr_db"], budgets_sorted
         ),
         "caveat": (
             "합성 청취자 코호트에서 얻은 결과이며 임상적 근거가 아닙니다. SNR 과 화자는 "

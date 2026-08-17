@@ -243,3 +243,48 @@ def test_run_is_recorded_in_the_registry(result):
     from audire.experiments.registry import load_runs
 
     assert result["run_id"] in {r["run_id"] for r in load_runs()}
+
+
+def test_evidence_band_is_not_degenerate_across_listeners():
+    """회귀 테스트.
+
+    처음에는 ``coverage`` 로 증거량 하위군을 나눴습니다. 측정해 보니 coverage·n_trials·
+    total_observations 는 청취자 간 분산이 **정확히 0** 이었습니다 — 교정 자극 목록이
+    결정론적이고 균형 잡혀 있어 모든 청취자가 같은 자극을 받기 때문입니다. 그 값으로
+    나누면 전원이 한 칸에 들어가 축이 아무것도 구분하지 못하는데, 표에는 한 줄이 찍혀
+    분석을 한 것처럼 보입니다.
+    """
+    cohort = build_cohort(
+        SimulationConfig(
+            name="spread", seeds=[7], n_listeners=40, n_calibration_trials=100, n_word_trials=20
+        ),
+        7,
+    )
+    # 전제: coverage 는 실제로 분산이 없습니다.
+    coverage = [
+        float(np.mean(list(r.estimated_confusion.coverage.values()))) for r in cohort.records
+    ]
+    assert np.std(coverage) == pytest.approx(0.0, abs=1e-12), "이 테스트의 전제가 깨졌습니다"
+
+    # 따라서 축은 실제로 청취자마다 다른 양을 써야 합니다.
+    bands = {v["evidence_band"] for v in listener_subgroups(cohort).values()}
+    assert len(bands) > 1, f"증거량 축이 한 칸으로 붕괴했습니다: {bands}"
+
+
+def test_summary_separates_overall_gain_from_within_condition_gain(result):
+    """조건이 섞이면 전체 이득에 '이 조건이 어렵다' 가 섞여 들어옵니다."""
+    rows = result["summary"]["headline"]["overall_vs_within_condition_gain"]
+    assert rows
+    for row in rows:
+        assert {"gain_overall", "gain_within_condition_mean", "gain_within_condition_min"} <= set(
+            row
+        )
+
+
+def test_budget_monotonicity_is_also_reported_within_condition(result):
+    """전체가 단조여도 조건 내부는 아닐 수 있으므로 둘 다 봅니다."""
+    within = result["summary"]["headline"]["budget_monotonicity_within_snr"]
+    assert within
+    for row in within:
+        assert "snr_db" in row
+        assert isinstance(row["is_monotone_increasing"], bool)

@@ -12213,195 +12213,6 @@ runs:
   error: null
   error_traceback: null
   notes: ''
-- run_id: e25_validation_sweep-20260817T030334Z-4c62415-ba277f
-  experiment: e25_validation_sweep
-  started_at_utc: '2026-08-17T03:03:34.378180+00:00'
-  git_sha: 4c62415e11bb0c2eb6ca931625f2363a9e793d72
-  git_dirty: true
-  lock_hash: fe09e6fa2cefa917
-  env_fingerprint: 7a484db960ff0e820699569ec7fec666e92789bf29d0886992029c62fe553f55
-  env_matches_lock: match
-  python: 3.12.9
-  platform: Darwin arm64
-  seeds:
-  - 101
-  - 202
-  - 303
-  - 404
-  - 505
-  config:
-    name: e25_validation_sweep
-    description: 개인화가 유용해지는 최소 교정 길이, 음향 조건과 화자에 대한 견고성, 하위군 붕괴 여부, 예산에 따른 이득의 단조성을 사전등록 격자로 확인합니다.
-    base_simulation:
-      name: e25_cohort
-      seeds:
-      - 101
-      - 202
-      - 303
-      - 404
-      - 505
-      n_listeners: 80
-      n_calibration_trials: 100
-      n_word_trials: 250
-      snr_conditions_db:
-      - 20.0
-      speakers:
-      - male
-      - female
-      severity:
-        evidence: literature
-        evidence_source: joo2026_error_rates
-        rationale: Group sizes mirror the reference study's design (20 normal / 20 mild / 20 moderate
-          / 12 severe, n=72) so that the simulated cohort has a comparable shape. This fixes the *proportions*,
-          not any listener's behaviour.
-        scheme: korean_study_4group
-        weights:
-          normal: 20.0
-          mild: 20.0
-          moderate: 20.0
-          severe: 12.0
-      audiogram:
-        evidence: clinical_convention
-        evidence_source: null
-        rationale: Age-related hearing loss in older adults characteristically slopes downward toward
-          high frequencies. The stratum PTA windows follow the named severity scheme; the slope and noise
-          magnitudes are chosen to produce realistic-looking but not evidence-derived audiogram shapes.
-        pta_window_db:
-          normal:
-          - 5.0
-          - 19.0
-          mild:
-          - 20.0
-          - 34.0
-          moderate:
-          - 35.0
-          - 49.0
-          moderately_severe:
-          - 50.0
-          - 64.0
-          severe:
-          - 65.0
-          - 85.0
-          profound:
-          - 86.0
-          - 100.0
-        slope_db_per_octave_mean: 6.0
-        slope_db_per_octave_sd: 3.0
-        threshold_noise_db_sd: 4.0
-        interaural_asymmetry_db_sd: 5.0
-        pta_method: pta4_500_1000_2000_4000
-      speech:
-        evidence: literature
-        evidence_source: joo2026_error_rates
-        rationale: Monosyllable correct-response rates per hearing group are anchored to the reference
-          study's reported total error rates (normal 18.3 %, mild 27.8 %, moderate 48.4 %, severe 80.4
-          % errors at MCL over 726 monosyllables), i.e. correct rates of 81.7 / 72.2 / 51.6 / 19.6 %.
-          SRT-PTA agreement is a clinical convention rather than a finding. The within-group spread is
-          an assumption.
-        accuracy_by_stratum:
-          normal: 0.817
-          mild: 0.722
-          moderate: 0.516
-          moderately_severe: 0.4
-          severe: 0.196
-          profound: 0.1
-        ability_sd_logit: 0.55
-        srt_minus_pta_mean_db: 0.0
-        srt_minus_pta_sd_db: 5.0
-        wrs_n_words: 50
-        pbmax_increment_mean: 6.0
-        pbmax_increment_sd: 4.0
-        p_has_pi_function: 0.5
-        p_has_loudness: 0.6
-        mcl_above_pta_db: 30.0
-        mcl_sd_db: 6.0
-        dynamic_range_db_mean: 30.0
-        dynamic_range_db_sd: 8.0
-      confusion:
-        evidence: literature
-        evidence_source: ma2026_similarity
-        rationale: The reference study reports that perceptual distance between phonemes shrinks as hearing
-          loss increases (onset 5.43 -> 3.05, nucleus 5.51 -> 3.53, coda 5.78 -> 3.66 from normal to severe)
-          and that confusions concentrate within phonetic classes. This motivates (a) within-class concentration
-          via a similarity kernel and (b) a concentration parameter that rises with severity. The specific
-          beta values and the Dirichlet concentration are assumptions.
-        position_difficulty:
-          onset: 1.15
-          nucleus: 0.7
-          coda: 1.15
-        similarity_beta_normal: 1.5
-        similarity_beta_severe: 4.0
-        dirichlet_concentration: 40.0
-        no_response_share: 0.05
-      trials:
-        evidence: assumption
-        evidence_source: null
-        rationale: 'Lexical repair, word-length effects and SNR effects are declared assumptions with
-          no numeric source. Their purpose is twofold. First, they make the generative process differ
-          structurally from the phoneme-independence scoring model, so that comparing the two is informative
-          rather than circular. Second, they bridge the gap between the context-free monosyllable task
-          the literature measures and the connected speech AUDIRE captions: a listener who misses one
-          segment of a word in running speech often still identifies it. The resulting word-level mishearing
-          base rate is therefore a CONFIGURED property of the simulation, is reported in every cohort
-          summary, and is swept explicitly in the sensitivity study rather than treated as a fixed fact.'
-        lexical_repair_base: 0.55
-        lexical_repair_per_extra_syllable: 0.12
-        lexical_repair_max: 0.9
-        lexical_repair_multi_error: 0.15
-        snr_logit_per_db: 0.06
-        reference_snr_db: 20.0
-        speaker_effects:
-          male: -0.1
-          female: 0.1
-          synthetic_tts: 0.0
-      words:
-        evidence: assumption
-        evidence_source: null
-        rationale: The synthetic word generator samples syllable counts from a distribution that resembles
-          Korean eojeol length in running text but is not measured from a corpus. Use `source='zeroth'`
-          to draw words from the CC BY-licensed Zeroth-Korean transcripts instead when a real distribution
-          matters.
-        source: synthetic
-        syllable_count_weights:
-          '1': 0.2
-          '2': 0.45
-          '3': 0.25
-          '4': 0.1
-        vocabulary_size: 400
-    calibration_lengths:
-    - 10
-    - 25
-    - 50
-    - 100
-    - 200
-    - 400
-    snr_conditions_db:
-    - 20.0
-    - 10.0
-    - 5.0
-    - 0.0
-    - -5.0
-    arm: clinical_plus_confusion
-    reference_arm: clinical
-    model: logistic
-    n_splits: 5
-    n_bootstrap: 0
-    ece_bins: 10
-    budgets:
-    - 0.1
-    - 0.2
-    - 0.3
-    - 0.5
-    primary_budget: 0.2
-  data_manifests: {}
-  artifacts: []
-  artifact_digests: {}
-  metrics: {}
-  status: running
-  finished_at_utc: null
-  error: null
-  error_traceback: null
-  notes: 개인화가 유용해지는 최소 교정 길이, 음향 조건과 화자에 대한 견고성, 하위군 붕괴 여부, 예산에 따른 이득의 단조성을 사전등록 격자로 확인합니다.
 - run_id: e25-test-20260817T030419Z-4c62415-4ce4db
   experiment: e25-test
   started_at_utc: '2026-08-17T03:04:19.790041+00:00'
@@ -14285,6 +14096,1981 @@ runs:
     , line 253, in run_validation_sweep\n    return _execute(cfg, rec)\n           ^^^^^^^^^^^^^^^^^^\n\
     \  File \"/Users/jaeminahn/Desktop/development/Audire/src/audire/experiments/validation_sweep.py\"\
     , line 277, in _execute\n    cohort = build_cohort(sim, seed)\n             ^^^^^^^^^^^^^^^^^^^^^^^\n\
+    \  File \"/Users/jaeminahn/Desktop/development/Audire/tests/unit/test_validation_sweep.py\", line\
+    \ 91, in flaky\n    raise RuntimeError(\"코호트 생성 실패\")\nRuntimeError: 코호트 생성 실패\n"
+  notes: ''
+- run_id: e25_validation_sweep-20260817T030334Z-4c62415-ba277f
+  experiment: e25_validation_sweep
+  started_at_utc: '2026-08-17T03:03:34.378180+00:00'
+  git_sha: 4c62415e11bb0c2eb6ca931625f2363a9e793d72
+  git_dirty: true
+  lock_hash: fe09e6fa2cefa917
+  env_fingerprint: 7a484db960ff0e820699569ec7fec666e92789bf29d0886992029c62fe553f55
+  env_matches_lock: match
+  python: 3.12.9
+  platform: Darwin arm64
+  seeds:
+  - 101
+  - 202
+  - 303
+  - 404
+  - 505
+  config:
+    name: e25_validation_sweep
+    description: 개인화가 유용해지는 최소 교정 길이, 음향 조건과 화자에 대한 견고성, 하위군 붕괴 여부, 예산에 따른 이득의 단조성을 사전등록 격자로 확인합니다.
+    base_simulation:
+      name: e25_cohort
+      seeds:
+      - 101
+      - 202
+      - 303
+      - 404
+      - 505
+      n_listeners: 80
+      n_calibration_trials: 100
+      n_word_trials: 250
+      snr_conditions_db:
+      - 20.0
+      speakers:
+      - male
+      - female
+      severity:
+        evidence: literature
+        evidence_source: joo2026_error_rates
+        rationale: Group sizes mirror the reference study's design (20 normal / 20 mild / 20 moderate
+          / 12 severe, n=72) so that the simulated cohort has a comparable shape. This fixes the *proportions*,
+          not any listener's behaviour.
+        scheme: korean_study_4group
+        weights:
+          normal: 20.0
+          mild: 20.0
+          moderate: 20.0
+          severe: 12.0
+      audiogram:
+        evidence: clinical_convention
+        evidence_source: null
+        rationale: Age-related hearing loss in older adults characteristically slopes downward toward
+          high frequencies. The stratum PTA windows follow the named severity scheme; the slope and noise
+          magnitudes are chosen to produce realistic-looking but not evidence-derived audiogram shapes.
+        pta_window_db:
+          normal:
+          - 5.0
+          - 19.0
+          mild:
+          - 20.0
+          - 34.0
+          moderate:
+          - 35.0
+          - 49.0
+          moderately_severe:
+          - 50.0
+          - 64.0
+          severe:
+          - 65.0
+          - 85.0
+          profound:
+          - 86.0
+          - 100.0
+        slope_db_per_octave_mean: 6.0
+        slope_db_per_octave_sd: 3.0
+        threshold_noise_db_sd: 4.0
+        interaural_asymmetry_db_sd: 5.0
+        pta_method: pta4_500_1000_2000_4000
+      speech:
+        evidence: literature
+        evidence_source: joo2026_error_rates
+        rationale: Monosyllable correct-response rates per hearing group are anchored to the reference
+          study's reported total error rates (normal 18.3 %, mild 27.8 %, moderate 48.4 %, severe 80.4
+          % errors at MCL over 726 monosyllables), i.e. correct rates of 81.7 / 72.2 / 51.6 / 19.6 %.
+          SRT-PTA agreement is a clinical convention rather than a finding. The within-group spread is
+          an assumption.
+        accuracy_by_stratum:
+          normal: 0.817
+          mild: 0.722
+          moderate: 0.516
+          moderately_severe: 0.4
+          severe: 0.196
+          profound: 0.1
+        ability_sd_logit: 0.55
+        srt_minus_pta_mean_db: 0.0
+        srt_minus_pta_sd_db: 5.0
+        wrs_n_words: 50
+        pbmax_increment_mean: 6.0
+        pbmax_increment_sd: 4.0
+        p_has_pi_function: 0.5
+        p_has_loudness: 0.6
+        mcl_above_pta_db: 30.0
+        mcl_sd_db: 6.0
+        dynamic_range_db_mean: 30.0
+        dynamic_range_db_sd: 8.0
+      confusion:
+        evidence: literature
+        evidence_source: ma2026_similarity
+        rationale: The reference study reports that perceptual distance between phonemes shrinks as hearing
+          loss increases (onset 5.43 -> 3.05, nucleus 5.51 -> 3.53, coda 5.78 -> 3.66 from normal to severe)
+          and that confusions concentrate within phonetic classes. This motivates (a) within-class concentration
+          via a similarity kernel and (b) a concentration parameter that rises with severity. The specific
+          beta values and the Dirichlet concentration are assumptions.
+        position_difficulty:
+          onset: 1.15
+          nucleus: 0.7
+          coda: 1.15
+        similarity_beta_normal: 1.5
+        similarity_beta_severe: 4.0
+        dirichlet_concentration: 40.0
+        no_response_share: 0.05
+      trials:
+        evidence: assumption
+        evidence_source: null
+        rationale: 'Lexical repair, word-length effects and SNR effects are declared assumptions with
+          no numeric source. Their purpose is twofold. First, they make the generative process differ
+          structurally from the phoneme-independence scoring model, so that comparing the two is informative
+          rather than circular. Second, they bridge the gap between the context-free monosyllable task
+          the literature measures and the connected speech AUDIRE captions: a listener who misses one
+          segment of a word in running speech often still identifies it. The resulting word-level mishearing
+          base rate is therefore a CONFIGURED property of the simulation, is reported in every cohort
+          summary, and is swept explicitly in the sensitivity study rather than treated as a fixed fact.'
+        lexical_repair_base: 0.55
+        lexical_repair_per_extra_syllable: 0.12
+        lexical_repair_max: 0.9
+        lexical_repair_multi_error: 0.15
+        snr_logit_per_db: 0.06
+        reference_snr_db: 20.0
+        speaker_effects:
+          male: -0.1
+          female: 0.1
+          synthetic_tts: 0.0
+      words:
+        evidence: assumption
+        evidence_source: null
+        rationale: The synthetic word generator samples syllable counts from a distribution that resembles
+          Korean eojeol length in running text but is not measured from a corpus. Use `source='zeroth'`
+          to draw words from the CC BY-licensed Zeroth-Korean transcripts instead when a real distribution
+          matters.
+        source: synthetic
+        syllable_count_weights:
+          '1': 0.2
+          '2': 0.45
+          '3': 0.25
+          '4': 0.1
+        vocabulary_size: 400
+    calibration_lengths:
+    - 10
+    - 25
+    - 50
+    - 100
+    - 200
+    - 400
+    snr_conditions_db:
+    - 20.0
+    - 10.0
+    - 5.0
+    - 0.0
+    - -5.0
+    arm: clinical_plus_confusion
+    reference_arm: clinical
+    model: logistic
+    n_splits: 5
+    n_bootstrap: 0
+    ece_bins: 10
+    budgets:
+    - 0.1
+    - 0.2
+    - 0.3
+    - 0.5
+    primary_budget: 0.2
+  data_manifests: {}
+  artifacts:
+  - experiments/artifacts/e25_validation_sweep-20260817T030334Z-4c62415-ba277f/validation_sweep_rows.json
+  - experiments/artifacts/e25_validation_sweep-20260817T030334Z-4c62415-ba277f/summary.json
+  artifact_digests:
+    experiments/artifacts/e25_validation_sweep-20260817T030334Z-4c62415-ba277f/validation_sweep_rows.json: 1aa11ddeee3892f8446559950125fd9726a0369d996c9a0a12f6676c86db72c4
+    experiments/artifacts/e25_validation_sweep-20260817T030334Z-4c62415-ba277f/summary.json: d00cc720f5525cd79858029db4532da4ea4b0612ba1435c856eea381273cd1dd
+  metrics:
+    primary_budget: 0.2
+    n_declared_cells: 30
+    calibration_lengths:
+    - 10
+    - 25
+    - 50
+    - 100
+    - 200
+    - 400
+    snr_conditions_db:
+    - 20.0
+    - 10.0
+    - 5.0
+    - 0.0
+    - -5.0
+    min_calibration_beating_word_length_on_every_seed: 10
+    budget_monotonicity:
+    - calibration_length: 10
+      gains_by_budget:
+        '0.1': 0.016430696514118586
+        '0.2': 0.02941946220734979
+        '0.3': 0.03631550344576937
+        '0.5': 0.04796931086706639
+      is_monotone_increasing: true
+    - calibration_length: 25
+      gains_by_budget:
+        '0.1': 0.01731097327324258
+        '0.2': 0.029753045367943244
+        '0.3': 0.03698761107015445
+        '0.5': 0.04882160477721222
+      is_monotone_increasing: true
+    - calibration_length: 50
+      gains_by_budget:
+        '0.1': 0.016576077137753796
+        '0.2': 0.030512355031923198
+        '0.3': 0.036862929151730686
+        '0.5': 0.04796502051954223
+      is_monotone_increasing: true
+    - calibration_length: 100
+      gains_by_budget:
+        '0.1': 0.017340456064568605
+        '0.2': 0.030550969498153058
+        '0.3': 0.03620406518205608
+        '0.5': 0.04882648335532478
+      is_monotone_increasing: true
+    - calibration_length: 200
+      gains_by_budget:
+        '0.1': 0.017569554662023968
+        '0.2': 0.03283530659699383
+        '0.3': 0.03784740469337171
+        '0.5': 0.04948406548848472
+      is_monotone_increasing: true
+    - calibration_length: 400
+      gains_by_budget:
+        '0.1': 0.017346957705496054
+        '0.2': 0.03251871777236143
+        '0.3': 0.03897761876014181
+        '0.5': 0.050846793626937024
+      is_monotone_increasing: true
+    n_budget_conditions_non_monotone: 0
+    caveat: 합성 청취자 코호트에서 얻은 결과이며 임상적 근거가 아닙니다. SNR 과 화자는 코호트 안에서 변하므로 조건 간 비교는 같은 청취자에 대해 짝지어져 있습니다.
+  status: completed
+  finished_at_utc: '2026-08-17T03:08:20.101479+00:00'
+  error: null
+  error_traceback: null
+  notes: 개인화가 유용해지는 최소 교정 길이, 음향 조건과 화자에 대한 견고성, 하위군 붕괴 여부, 예산에 따른 이득의 단조성을 사전등록 격자로 확인합니다.
+- run_id: e25-test-20260817T031106Z-f492557-e5d3a7
+  experiment: e25-test
+  started_at_utc: '2026-08-17T03:11:06.830534+00:00'
+  git_sha: f49255756e2a175209b84e3dcb58bf723d4bef2a
+  git_dirty: true
+  lock_hash: fe09e6fa2cefa917
+  env_fingerprint: 7a484db960ff0e820699569ec7fec666e92789bf29d0886992029c62fe553f55
+  env_matches_lock: match
+  python: 3.12.9
+  platform: Darwin arm64
+  seeds:
+  - 1
+  - 2
+  config:
+    name: e25-test
+    description: ''
+    base_simulation:
+      name: e25-tiny
+      seeds:
+      - 1
+      - 2
+      n_listeners: 12
+      n_calibration_trials: 20
+      n_word_trials: 30
+      snr_conditions_db:
+      - 20.0
+      speakers:
+      - male
+      - female
+      severity:
+        evidence: literature
+        evidence_source: joo2026_error_rates
+        rationale: Group sizes mirror the reference study's design (20 normal / 20 mild / 20 moderate
+          / 12 severe, n=72) so that the simulated cohort has a comparable shape. This fixes the *proportions*,
+          not any listener's behaviour.
+        scheme: korean_study_4group
+        weights:
+          normal: 20.0
+          mild: 20.0
+          moderate: 20.0
+          severe: 12.0
+      audiogram:
+        evidence: clinical_convention
+        evidence_source: null
+        rationale: Age-related hearing loss in older adults characteristically slopes downward toward
+          high frequencies. The stratum PTA windows follow the named severity scheme; the slope and noise
+          magnitudes are chosen to produce realistic-looking but not evidence-derived audiogram shapes.
+        pta_window_db:
+          normal:
+          - 5.0
+          - 19.0
+          mild:
+          - 20.0
+          - 34.0
+          moderate:
+          - 35.0
+          - 49.0
+          moderately_severe:
+          - 50.0
+          - 64.0
+          severe:
+          - 65.0
+          - 85.0
+          profound:
+          - 86.0
+          - 100.0
+        slope_db_per_octave_mean: 6.0
+        slope_db_per_octave_sd: 3.0
+        threshold_noise_db_sd: 4.0
+        interaural_asymmetry_db_sd: 5.0
+        pta_method: pta4_500_1000_2000_4000
+      speech:
+        evidence: literature
+        evidence_source: joo2026_error_rates
+        rationale: Monosyllable correct-response rates per hearing group are anchored to the reference
+          study's reported total error rates (normal 18.3 %, mild 27.8 %, moderate 48.4 %, severe 80.4
+          % errors at MCL over 726 monosyllables), i.e. correct rates of 81.7 / 72.2 / 51.6 / 19.6 %.
+          SRT-PTA agreement is a clinical convention rather than a finding. The within-group spread is
+          an assumption.
+        accuracy_by_stratum:
+          normal: 0.817
+          mild: 0.722
+          moderate: 0.516
+          moderately_severe: 0.4
+          severe: 0.196
+          profound: 0.1
+        ability_sd_logit: 0.55
+        srt_minus_pta_mean_db: 0.0
+        srt_minus_pta_sd_db: 5.0
+        wrs_n_words: 50
+        pbmax_increment_mean: 6.0
+        pbmax_increment_sd: 4.0
+        p_has_pi_function: 0.5
+        p_has_loudness: 0.6
+        mcl_above_pta_db: 30.0
+        mcl_sd_db: 6.0
+        dynamic_range_db_mean: 30.0
+        dynamic_range_db_sd: 8.0
+      confusion:
+        evidence: literature
+        evidence_source: ma2026_similarity
+        rationale: The reference study reports that perceptual distance between phonemes shrinks as hearing
+          loss increases (onset 5.43 -> 3.05, nucleus 5.51 -> 3.53, coda 5.78 -> 3.66 from normal to severe)
+          and that confusions concentrate within phonetic classes. This motivates (a) within-class concentration
+          via a similarity kernel and (b) a concentration parameter that rises with severity. The specific
+          beta values and the Dirichlet concentration are assumptions.
+        position_difficulty:
+          onset: 1.15
+          nucleus: 0.7
+          coda: 1.15
+        similarity_beta_normal: 1.5
+        similarity_beta_severe: 4.0
+        dirichlet_concentration: 40.0
+        no_response_share: 0.05
+      trials:
+        evidence: assumption
+        evidence_source: null
+        rationale: 'Lexical repair, word-length effects and SNR effects are declared assumptions with
+          no numeric source. Their purpose is twofold. First, they make the generative process differ
+          structurally from the phoneme-independence scoring model, so that comparing the two is informative
+          rather than circular. Second, they bridge the gap between the context-free monosyllable task
+          the literature measures and the connected speech AUDIRE captions: a listener who misses one
+          segment of a word in running speech often still identifies it. The resulting word-level mishearing
+          base rate is therefore a CONFIGURED property of the simulation, is reported in every cohort
+          summary, and is swept explicitly in the sensitivity study rather than treated as a fixed fact.'
+        lexical_repair_base: 0.55
+        lexical_repair_per_extra_syllable: 0.12
+        lexical_repair_max: 0.9
+        lexical_repair_multi_error: 0.15
+        snr_logit_per_db: 0.06
+        reference_snr_db: 20.0
+        speaker_effects:
+          male: -0.1
+          female: 0.1
+          synthetic_tts: 0.0
+      words:
+        evidence: assumption
+        evidence_source: null
+        rationale: The synthetic word generator samples syllable counts from a distribution that resembles
+          Korean eojeol length in running text but is not measured from a corpus. Use `source='zeroth'`
+          to draw words from the CC BY-licensed Zeroth-Korean transcripts instead when a real distribution
+          matters.
+        source: synthetic
+        syllable_count_weights:
+          '1': 0.2
+          '2': 0.45
+          '3': 0.25
+          '4': 0.1
+        vocabulary_size: 400
+    calibration_lengths:
+    - 10
+    - 40
+    snr_conditions_db:
+    - 20.0
+    - 0.0
+    arm: clinical_plus_confusion
+    reference_arm: clinical
+    model: logistic
+    n_splits: 3
+    n_bootstrap: 0
+    ece_bins: 10
+    budgets:
+    - 0.1
+    - 0.2
+    primary_budget: 0.2
+  data_manifests: {}
+  artifacts:
+  - experiments/artifacts/e25-test-20260817T031106Z-f492557-e5d3a7/validation_sweep_rows.json
+  - experiments/artifacts/e25-test-20260817T031106Z-f492557-e5d3a7/summary.json
+  artifact_digests:
+    experiments/artifacts/e25-test-20260817T031106Z-f492557-e5d3a7/validation_sweep_rows.json: a99b69e4582a94adb9dc735e823b74ed70b648c38412d2887cec31405b2b338e
+    experiments/artifacts/e25-test-20260817T031106Z-f492557-e5d3a7/summary.json: b19235461c8f4b3ede104a0b0c1ca184856433b399a1ffa7209f4a7ac20cd11b
+  metrics:
+    primary_budget: 0.2
+    overall_vs_within_condition_gain:
+    - calibration_length: 10
+      gain_overall: 0.04272070211667525
+      gain_within_condition_mean: -0.04343139383412941
+      gain_within_condition_min: -0.0718627876682588
+    - calibration_length: 40
+      gain_overall: 0.05431816505642009
+      gain_within_condition_mean: -0.01139833711262285
+      gain_within_condition_min: -0.012592592592592627
+    n_declared_cells: 4
+    calibration_lengths:
+    - 10
+    - 40
+    snr_conditions_db:
+    - 20.0
+    - 0.0
+    min_calibration_beating_word_length_on_every_seed: 10
+    budget_monotonicity:
+    - calibration_length: 10
+      gains_by_budget:
+        '0.1': 0.025020281731691116
+        '0.2': 0.04272070211667525
+      is_monotone_increasing: true
+    - calibration_length: 40
+      gains_by_budget:
+        '0.1': 0.02380337783022346
+        '0.2': 0.05431816505642009
+      is_monotone_increasing: true
+    n_budget_conditions_non_monotone: 0
+    budget_monotonicity_within_snr:
+    - calibration_length: 10
+      snr_db: '0'
+      gains_by_budget:
+        '0.1': -0.01370370370370369
+        '0.2': -0.015000000000000013
+      is_monotone_increasing: false
+    - calibration_length: 10
+      snr_db: '20'
+      gains_by_budget:
+        '0.1': -0.030612244897959183
+        '0.2': -0.0718627876682588
+      is_monotone_increasing: false
+    - calibration_length: 40
+      snr_db: '0'
+      gains_by_budget:
+        '0.1': -0.03611111111111111
+        '0.2': -0.012592592592592627
+      is_monotone_increasing: true
+    - calibration_length: 40
+      snr_db: '20'
+      gains_by_budget:
+        '0.1': 0.0
+        '0.2': -0.010204081632653073
+      is_monotone_increasing: false
+    caveat: 합성 청취자 코호트에서 얻은 결과이며 임상적 근거가 아닙니다. SNR 과 화자는 코호트 안에서 변하므로 조건 간 비교는 같은 청취자에 대해 짝지어져 있습니다.
+  status: completed
+  finished_at_utc: '2026-08-17T03:11:08.774746+00:00'
+  error: null
+  error_traceback: null
+  notes: ''
+- run_id: e25-missing-20260817T031110Z-f492557-06a178
+  experiment: e25-missing
+  started_at_utc: '2026-08-17T03:11:10.308948+00:00'
+  git_sha: f49255756e2a175209b84e3dcb58bf723d4bef2a
+  git_dirty: true
+  lock_hash: fe09e6fa2cefa917
+  env_fingerprint: 7a484db960ff0e820699569ec7fec666e92789bf29d0886992029c62fe553f55
+  env_matches_lock: match
+  python: 3.12.9
+  platform: Darwin arm64
+  seeds:
+  - 1
+  - 2
+  config:
+    name: e25-missing
+    description: ''
+    base_simulation:
+      name: e25-tiny
+      seeds:
+      - 1
+      - 2
+      n_listeners: 12
+      n_calibration_trials: 20
+      n_word_trials: 30
+      snr_conditions_db:
+      - 20.0
+      speakers:
+      - male
+      - female
+      severity:
+        evidence: literature
+        evidence_source: joo2026_error_rates
+        rationale: Group sizes mirror the reference study's design (20 normal / 20 mild / 20 moderate
+          / 12 severe, n=72) so that the simulated cohort has a comparable shape. This fixes the *proportions*,
+          not any listener's behaviour.
+        scheme: korean_study_4group
+        weights:
+          normal: 20.0
+          mild: 20.0
+          moderate: 20.0
+          severe: 12.0
+      audiogram:
+        evidence: clinical_convention
+        evidence_source: null
+        rationale: Age-related hearing loss in older adults characteristically slopes downward toward
+          high frequencies. The stratum PTA windows follow the named severity scheme; the slope and noise
+          magnitudes are chosen to produce realistic-looking but not evidence-derived audiogram shapes.
+        pta_window_db:
+          normal:
+          - 5.0
+          - 19.0
+          mild:
+          - 20.0
+          - 34.0
+          moderate:
+          - 35.0
+          - 49.0
+          moderately_severe:
+          - 50.0
+          - 64.0
+          severe:
+          - 65.0
+          - 85.0
+          profound:
+          - 86.0
+          - 100.0
+        slope_db_per_octave_mean: 6.0
+        slope_db_per_octave_sd: 3.0
+        threshold_noise_db_sd: 4.0
+        interaural_asymmetry_db_sd: 5.0
+        pta_method: pta4_500_1000_2000_4000
+      speech:
+        evidence: literature
+        evidence_source: joo2026_error_rates
+        rationale: Monosyllable correct-response rates per hearing group are anchored to the reference
+          study's reported total error rates (normal 18.3 %, mild 27.8 %, moderate 48.4 %, severe 80.4
+          % errors at MCL over 726 monosyllables), i.e. correct rates of 81.7 / 72.2 / 51.6 / 19.6 %.
+          SRT-PTA agreement is a clinical convention rather than a finding. The within-group spread is
+          an assumption.
+        accuracy_by_stratum:
+          normal: 0.817
+          mild: 0.722
+          moderate: 0.516
+          moderately_severe: 0.4
+          severe: 0.196
+          profound: 0.1
+        ability_sd_logit: 0.55
+        srt_minus_pta_mean_db: 0.0
+        srt_minus_pta_sd_db: 5.0
+        wrs_n_words: 50
+        pbmax_increment_mean: 6.0
+        pbmax_increment_sd: 4.0
+        p_has_pi_function: 0.5
+        p_has_loudness: 0.6
+        mcl_above_pta_db: 30.0
+        mcl_sd_db: 6.0
+        dynamic_range_db_mean: 30.0
+        dynamic_range_db_sd: 8.0
+      confusion:
+        evidence: literature
+        evidence_source: ma2026_similarity
+        rationale: The reference study reports that perceptual distance between phonemes shrinks as hearing
+          loss increases (onset 5.43 -> 3.05, nucleus 5.51 -> 3.53, coda 5.78 -> 3.66 from normal to severe)
+          and that confusions concentrate within phonetic classes. This motivates (a) within-class concentration
+          via a similarity kernel and (b) a concentration parameter that rises with severity. The specific
+          beta values and the Dirichlet concentration are assumptions.
+        position_difficulty:
+          onset: 1.15
+          nucleus: 0.7
+          coda: 1.15
+        similarity_beta_normal: 1.5
+        similarity_beta_severe: 4.0
+        dirichlet_concentration: 40.0
+        no_response_share: 0.05
+      trials:
+        evidence: assumption
+        evidence_source: null
+        rationale: 'Lexical repair, word-length effects and SNR effects are declared assumptions with
+          no numeric source. Their purpose is twofold. First, they make the generative process differ
+          structurally from the phoneme-independence scoring model, so that comparing the two is informative
+          rather than circular. Second, they bridge the gap between the context-free monosyllable task
+          the literature measures and the connected speech AUDIRE captions: a listener who misses one
+          segment of a word in running speech often still identifies it. The resulting word-level mishearing
+          base rate is therefore a CONFIGURED property of the simulation, is reported in every cohort
+          summary, and is swept explicitly in the sensitivity study rather than treated as a fixed fact.'
+        lexical_repair_base: 0.55
+        lexical_repair_per_extra_syllable: 0.12
+        lexical_repair_max: 0.9
+        lexical_repair_multi_error: 0.15
+        snr_logit_per_db: 0.06
+        reference_snr_db: 20.0
+        speaker_effects:
+          male: -0.1
+          female: 0.1
+          synthetic_tts: 0.0
+      words:
+        evidence: assumption
+        evidence_source: null
+        rationale: The synthetic word generator samples syllable counts from a distribution that resembles
+          Korean eojeol length in running text but is not measured from a corpus. Use `source='zeroth'`
+          to draw words from the CC BY-licensed Zeroth-Korean transcripts instead when a real distribution
+          matters.
+        source: synthetic
+        syllable_count_weights:
+          '1': 0.2
+          '2': 0.45
+          '3': 0.25
+          '4': 0.1
+        vocabulary_size: 400
+    calibration_lengths:
+    - 10
+    - 40
+    snr_conditions_db:
+    - 20.0
+    - 0.0
+    arm: clinical_plus_confusion
+    reference_arm: clinical
+    model: logistic
+    n_splits: 3
+    n_bootstrap: 0
+    ece_bins: 10
+    budgets:
+    - 0.1
+    - 0.2
+    primary_budget: 0.2
+  data_manifests: {}
+  artifacts: []
+  artifact_digests: {}
+  metrics: {}
+  status: failed
+  finished_at_utc: '2026-08-17T03:11:11.459554+00:00'
+  error: 'RuntimeError: 코호트 생성 실패'
+  error_traceback: "Traceback (most recent call last):\n  File \"/Users/jaeminahn/Desktop/development/Audire/src/audire/experiments/registry.py\"\
+    , line 395, in tracked_run\n    yield record\n  File \"/Users/jaeminahn/Desktop/development/Audire/src/audire/experiments/validation_sweep.py\"\
+    , line 260, in run_validation_sweep\n    return _execute(cfg, rec)\n           ^^^^^^^^^^^^^^^^^^\n\
+    \  File \"/Users/jaeminahn/Desktop/development/Audire/src/audire/experiments/validation_sweep.py\"\
+    , line 284, in _execute\n    cohort = build_cohort(sim, seed)\n             ^^^^^^^^^^^^^^^^^^^^^^^\n\
+    \  File \"/Users/jaeminahn/Desktop/development/Audire/tests/unit/test_validation_sweep.py\", line\
+    \ 91, in flaky\n    raise RuntimeError(\"코호트 생성 실패\")\nRuntimeError: 코호트 생성 실패\n"
+  notes: ''
+- run_id: e25_validation_sweep-20260817T031123Z-f492557-2d5bc9
+  experiment: e25_validation_sweep
+  started_at_utc: '2026-08-17T03:11:23.856000+00:00'
+  git_sha: f49255756e2a175209b84e3dcb58bf723d4bef2a
+  git_dirty: true
+  lock_hash: fe09e6fa2cefa917
+  env_fingerprint: 7a484db960ff0e820699569ec7fec666e92789bf29d0886992029c62fe553f55
+  env_matches_lock: match
+  python: 3.12.9
+  platform: Darwin arm64
+  seeds:
+  - 101
+  - 202
+  - 303
+  - 404
+  - 505
+  config:
+    name: e25_validation_sweep
+    description: 개인화가 유용해지는 최소 교정 길이, 음향 조건과 화자에 대한 견고성, 하위군 붕괴 여부, 예산에 따른 이득의 단조성을 사전등록 격자로 확인합니다.
+    base_simulation:
+      name: e25_cohort
+      seeds:
+      - 101
+      - 202
+      - 303
+      - 404
+      - 505
+      n_listeners: 80
+      n_calibration_trials: 100
+      n_word_trials: 250
+      snr_conditions_db:
+      - 20.0
+      speakers:
+      - male
+      - female
+      severity:
+        evidence: literature
+        evidence_source: joo2026_error_rates
+        rationale: Group sizes mirror the reference study's design (20 normal / 20 mild / 20 moderate
+          / 12 severe, n=72) so that the simulated cohort has a comparable shape. This fixes the *proportions*,
+          not any listener's behaviour.
+        scheme: korean_study_4group
+        weights:
+          normal: 20.0
+          mild: 20.0
+          moderate: 20.0
+          severe: 12.0
+      audiogram:
+        evidence: clinical_convention
+        evidence_source: null
+        rationale: Age-related hearing loss in older adults characteristically slopes downward toward
+          high frequencies. The stratum PTA windows follow the named severity scheme; the slope and noise
+          magnitudes are chosen to produce realistic-looking but not evidence-derived audiogram shapes.
+        pta_window_db:
+          normal:
+          - 5.0
+          - 19.0
+          mild:
+          - 20.0
+          - 34.0
+          moderate:
+          - 35.0
+          - 49.0
+          moderately_severe:
+          - 50.0
+          - 64.0
+          severe:
+          - 65.0
+          - 85.0
+          profound:
+          - 86.0
+          - 100.0
+        slope_db_per_octave_mean: 6.0
+        slope_db_per_octave_sd: 3.0
+        threshold_noise_db_sd: 4.0
+        interaural_asymmetry_db_sd: 5.0
+        pta_method: pta4_500_1000_2000_4000
+      speech:
+        evidence: literature
+        evidence_source: joo2026_error_rates
+        rationale: Monosyllable correct-response rates per hearing group are anchored to the reference
+          study's reported total error rates (normal 18.3 %, mild 27.8 %, moderate 48.4 %, severe 80.4
+          % errors at MCL over 726 monosyllables), i.e. correct rates of 81.7 / 72.2 / 51.6 / 19.6 %.
+          SRT-PTA agreement is a clinical convention rather than a finding. The within-group spread is
+          an assumption.
+        accuracy_by_stratum:
+          normal: 0.817
+          mild: 0.722
+          moderate: 0.516
+          moderately_severe: 0.4
+          severe: 0.196
+          profound: 0.1
+        ability_sd_logit: 0.55
+        srt_minus_pta_mean_db: 0.0
+        srt_minus_pta_sd_db: 5.0
+        wrs_n_words: 50
+        pbmax_increment_mean: 6.0
+        pbmax_increment_sd: 4.0
+        p_has_pi_function: 0.5
+        p_has_loudness: 0.6
+        mcl_above_pta_db: 30.0
+        mcl_sd_db: 6.0
+        dynamic_range_db_mean: 30.0
+        dynamic_range_db_sd: 8.0
+      confusion:
+        evidence: literature
+        evidence_source: ma2026_similarity
+        rationale: The reference study reports that perceptual distance between phonemes shrinks as hearing
+          loss increases (onset 5.43 -> 3.05, nucleus 5.51 -> 3.53, coda 5.78 -> 3.66 from normal to severe)
+          and that confusions concentrate within phonetic classes. This motivates (a) within-class concentration
+          via a similarity kernel and (b) a concentration parameter that rises with severity. The specific
+          beta values and the Dirichlet concentration are assumptions.
+        position_difficulty:
+          onset: 1.15
+          nucleus: 0.7
+          coda: 1.15
+        similarity_beta_normal: 1.5
+        similarity_beta_severe: 4.0
+        dirichlet_concentration: 40.0
+        no_response_share: 0.05
+      trials:
+        evidence: assumption
+        evidence_source: null
+        rationale: 'Lexical repair, word-length effects and SNR effects are declared assumptions with
+          no numeric source. Their purpose is twofold. First, they make the generative process differ
+          structurally from the phoneme-independence scoring model, so that comparing the two is informative
+          rather than circular. Second, they bridge the gap between the context-free monosyllable task
+          the literature measures and the connected speech AUDIRE captions: a listener who misses one
+          segment of a word in running speech often still identifies it. The resulting word-level mishearing
+          base rate is therefore a CONFIGURED property of the simulation, is reported in every cohort
+          summary, and is swept explicitly in the sensitivity study rather than treated as a fixed fact.'
+        lexical_repair_base: 0.55
+        lexical_repair_per_extra_syllable: 0.12
+        lexical_repair_max: 0.9
+        lexical_repair_multi_error: 0.15
+        snr_logit_per_db: 0.06
+        reference_snr_db: 20.0
+        speaker_effects:
+          male: -0.1
+          female: 0.1
+          synthetic_tts: 0.0
+      words:
+        evidence: assumption
+        evidence_source: null
+        rationale: The synthetic word generator samples syllable counts from a distribution that resembles
+          Korean eojeol length in running text but is not measured from a corpus. Use `source='zeroth'`
+          to draw words from the CC BY-licensed Zeroth-Korean transcripts instead when a real distribution
+          matters.
+        source: synthetic
+        syllable_count_weights:
+          '1': 0.2
+          '2': 0.45
+          '3': 0.25
+          '4': 0.1
+        vocabulary_size: 400
+    calibration_lengths:
+    - 10
+    - 25
+    - 50
+    - 100
+    - 200
+    - 400
+    snr_conditions_db:
+    - 20.0
+    - 10.0
+    - 5.0
+    - 0.0
+    - -5.0
+    arm: clinical_plus_confusion
+    reference_arm: clinical
+    model: logistic
+    n_splits: 5
+    n_bootstrap: 0
+    ece_bins: 10
+    budgets:
+    - 0.1
+    - 0.2
+    - 0.3
+    - 0.5
+    primary_budget: 0.2
+  data_manifests: {}
+  artifacts:
+  - experiments/artifacts/e25_validation_sweep-20260817T031123Z-f492557-2d5bc9/validation_sweep_rows.json
+  - experiments/artifacts/e25_validation_sweep-20260817T031123Z-f492557-2d5bc9/summary.json
+  artifact_digests:
+    experiments/artifacts/e25_validation_sweep-20260817T031123Z-f492557-2d5bc9/validation_sweep_rows.json: cb1b5a43e17d919e0b816b1b304b2767275e42ab618442bbce0624cdfd34be48
+    experiments/artifacts/e25_validation_sweep-20260817T031123Z-f492557-2d5bc9/summary.json: 1394d2b2fd015533beecb9cb84e55eee19d2ee5233394c818e427581da1d9a2b
+  metrics:
+    primary_budget: 0.2
+    overall_vs_within_condition_gain:
+    - calibration_length: 10
+      gain_overall: 0.02941946220734979
+      gain_within_condition_mean: 0.0021515401732277615
+      gain_within_condition_min: -5.037373873611473e-05
+    - calibration_length: 25
+      gain_overall: 0.029753045367943244
+      gain_within_condition_mean: 0.003110063853486993
+      gain_within_condition_min: 0.0008560151298118657
+    - calibration_length: 50
+      gain_overall: 0.030512355031923198
+      gain_within_condition_mean: 0.0034701880813065356
+      gain_within_condition_min: 0.0010486064404914952
+    - calibration_length: 100
+      gain_overall: 0.030550969498153058
+      gain_within_condition_mean: 0.0026409396840587707
+      gain_within_condition_min: 0.0009205319550588176
+    - calibration_length: 200
+      gain_overall: 0.03283530659699383
+      gain_within_condition_mean: 0.0033140644268956007
+      gain_within_condition_min: 0.00162586845706858
+    - calibration_length: 400
+      gain_overall: 0.03251871777236143
+      gain_within_condition_mean: 0.005047715248117928
+      gain_within_condition_min: 0.003667434368150918
+    n_declared_cells: 30
+    calibration_lengths:
+    - 10
+    - 25
+    - 50
+    - 100
+    - 200
+    - 400
+    snr_conditions_db:
+    - 20.0
+    - 10.0
+    - 5.0
+    - 0.0
+    - -5.0
+    min_calibration_beating_word_length_on_every_seed: 10
+    budget_monotonicity:
+    - calibration_length: 10
+      gains_by_budget:
+        '0.1': 0.016430696514118586
+        '0.2': 0.02941946220734979
+        '0.3': 0.03631550344576937
+        '0.5': 0.04796931086706639
+      is_monotone_increasing: true
+    - calibration_length: 25
+      gains_by_budget:
+        '0.1': 0.01731097327324258
+        '0.2': 0.029753045367943244
+        '0.3': 0.03698761107015445
+        '0.5': 0.04882160477721222
+      is_monotone_increasing: true
+    - calibration_length: 50
+      gains_by_budget:
+        '0.1': 0.016576077137753796
+        '0.2': 0.030512355031923198
+        '0.3': 0.036862929151730686
+        '0.5': 0.04796502051954223
+      is_monotone_increasing: true
+    - calibration_length: 100
+      gains_by_budget:
+        '0.1': 0.017340456064568605
+        '0.2': 0.030550969498153058
+        '0.3': 0.03620406518205608
+        '0.5': 0.04882648335532478
+      is_monotone_increasing: true
+    - calibration_length: 200
+      gains_by_budget:
+        '0.1': 0.017569554662023968
+        '0.2': 0.03283530659699383
+        '0.3': 0.03784740469337171
+        '0.5': 0.04948406548848472
+      is_monotone_increasing: true
+    - calibration_length: 400
+      gains_by_budget:
+        '0.1': 0.017346957705496054
+        '0.2': 0.03251871777236143
+        '0.3': 0.03897761876014181
+        '0.5': 0.050846793626937024
+      is_monotone_increasing: true
+    n_budget_conditions_non_monotone: 0
+    budget_monotonicity_within_snr:
+    - calibration_length: 10
+      snr_db: '-5'
+      gains_by_budget:
+        '0.1': 0.0012378348125051757
+        '0.2': 0.0023188183369824422
+        '0.3': 0.0003668878291896771
+        '0.5': -0.00027566658718651825
+      is_monotone_increasing: false
+    - calibration_length: 10
+      snr_db: '0'
+      gains_by_budget:
+        '0.1': 0.0013617849455694136
+        '0.2': 0.0035802768242839066
+        '0.3': 0.004279329771141272
+        '0.5': 0.0002791623212354155
+      is_monotone_increasing: false
+    - calibration_length: 10
+      snr_db: '10'
+      gains_by_budget:
+        '0.1': 0.001809791461151475
+        '0.2': -5.037373873611473e-05
+        '0.3': 0.0021700864934923294
+        '0.5': 0.0072457195361393945
+      is_monotone_increasing: false
+    - calibration_length: 10
+      snr_db: '20'
+      gains_by_budget:
+        '0.1': 0.003994640565268581
+        '0.2': 0.0032707894673343675
+        '0.3': 0.0007388184853484691
+        '0.5': 0.002555665516915684
+      is_monotone_increasing: false
+    - calibration_length: 10
+      snr_db: '5'
+      gains_by_budget:
+        '0.1': 0.0004830976026107464
+        '0.2': 0.0016381899762742068
+        '0.3': 0.00161743227400466
+        '0.5': 0.0010617224607142762
+      is_monotone_increasing: false
+    - calibration_length: 25
+      snr_db: '-5'
+      gains_by_budget:
+        '0.1': 0.0007742464628262197
+        '0.2': 0.004386747275978492
+        '0.3': 0.0014064688162509164
+        '0.5': 0.0013990561094302078
+      is_monotone_increasing: false
+    - calibration_length: 25
+      snr_db: '0'
+      gains_by_budget:
+        '0.1': 0.0009916680011329254
+        '0.2': 0.0035426498852861254
+        '0.3': 0.003081432631776382
+        '0.5': 0.003864436568365037
+      is_monotone_increasing: false
+    - calibration_length: 25
+      snr_db: '10'
+      gains_by_budget:
+        '0.1': 0.003238737935923397
+        '0.2': 0.004112939774998076
+        '0.3': 0.0031704712039311465
+        '0.5': 0.006265043551097693
+      is_monotone_increasing: false
+    - calibration_length: 25
+      snr_db: '20'
+      gains_by_budget:
+        '0.1': 0.0006170216734563804
+        '0.2': 0.0026519672013604056
+        '0.3': 0.0018042858335817313
+        '0.5': 0.0059156169495854895
+      is_monotone_increasing: false
+    - calibration_length: 25
+      snr_db: '5'
+      gains_by_budget:
+        '0.1': -0.00020987125470846302
+        '0.2': 0.0008560151298118657
+        '0.3': 0.0007472002293776536
+        '0.5': 0.001517540739554124
+      is_monotone_increasing: false
+    - calibration_length: 50
+      snr_db: '-5'
+      gains_by_budget:
+        '0.1': 0.0009349617849301106
+        '0.2': 0.0034759578757391552
+        '0.3': 0.0015577748164305016
+        '0.5': -0.0005248476737286234
+      is_monotone_increasing: false
+    - calibration_length: 50
+      snr_db: '0'
+      gains_by_budget:
+        '0.1': 0.0018318151279961615
+        '0.2': 0.004228469354967368
+        '0.3': 0.00369176096034769
+        '0.5': 0.003379338490666628
+      is_monotone_increasing: false
+    - calibration_length: 50
+      snr_db: '10'
+      gains_by_budget:
+        '0.1': 0.004589067010819428
+        '0.2': 0.003183994887906094
+        '0.3': 0.0006840418685691296
+        '0.5': 0.00369113929359981
+      is_monotone_increasing: false
+    - calibration_length: 50
+      snr_db: '20'
+      gains_by_budget:
+        '0.1': 0.0032043464140841748
+        '0.2': 0.005413911847428565
+        '0.3': 0.0024617327615524265
+        '0.5': 0.0031123414399835125
+      is_monotone_increasing: false
+    - calibration_length: 50
+      snr_db: '5'
+      gains_by_budget:
+        '0.1': -0.0007447952924313772
+        '0.2': 0.0010486064404914952
+        '0.3': 0.0013474630178987757
+        '0.5': -0.0012679243457609734
+      is_monotone_increasing: false
+    - calibration_length: 100
+      snr_db: '-5'
+      gains_by_budget:
+        '0.1': 0.0003947797375191936
+        '0.2': 0.0009205319550588176
+        '0.3': 0.0001255723587086921
+        '0.5': 0.0008502337445776664
+      is_monotone_increasing: false
+    - calibration_length: 100
+      snr_db: '0'
+      gains_by_budget:
+        '0.1': 0.004174001497762858
+        '0.2': 0.004292017584708346
+        '0.3': 0.00430549420939017
+        '0.5': 0.003963189583273685
+      is_monotone_increasing: false
+    - calibration_length: 100
+      snr_db: '10'
+      gains_by_budget:
+        '0.1': 0.00516458237823037
+        '0.2': 0.0024651876682693697
+        '0.3': 0.003413177460776129
+        '0.5': 0.00964590281222406
+      is_monotone_increasing: false
+    - calibration_length: 100
+      snr_db: '20'
+      gains_by_budget:
+        '0.1': 0.0029487964576413008
+        '0.2': 0.002414357199220685
+        '0.3': 0.0016306803772680235
+        '0.5': 0.00345435763890658
+      is_monotone_increasing: false
+    - calibration_length: 100
+      snr_db: '5'
+      gains_by_budget:
+        '0.1': 0.0009641499601666853
+        '0.2': 0.003112604013036635
+        '0.3': 0.0020052997944022266
+        '0.5': -0.0008179764916891319
+      is_monotone_increasing: false
+    - calibration_length: 200
+      snr_db: '-5'
+      gains_by_budget:
+        '0.1': 0.0012418637663475674
+        '0.2': 0.00162586845706858
+        '0.3': 0.0010262489286112174
+        '0.5': 0.002213257853933359
+      is_monotone_increasing: false
+    - calibration_length: 200
+      snr_db: '0'
+      gains_by_budget:
+        '0.1': 0.0021858867471318795
+        '0.2': 0.0048262993198764205
+        '0.3': 0.006767105236551241
+        '0.5': 0.005932024122091128
+      is_monotone_increasing: false
+    - calibration_length: 200
+      snr_db: '10'
+      gains_by_budget:
+        '0.1': 0.0037948319953908655
+        '0.2': 0.0036152035347154165
+        '0.3': 0.0035834109618181897
+        '0.5': 0.010756951286153305
+      is_monotone_increasing: false
+    - calibration_length: 200
+      snr_db: '20'
+      gains_by_budget:
+        '0.1': -0.00023535160226491602
+        '0.2': 0.0016921626410055456
+        '0.3': 0.0037320657914708733
+        '0.5': 0.006941997519654098
+      is_monotone_increasing: true
+    - calibration_length: 200
+      snr_db: '5'
+      gains_by_budget:
+        '0.1': 0.0028736281671252833
+        '0.2': 0.004810788181812043
+        '0.3': -0.0007444345752467552
+        '0.5': -0.0018739094762769248
+      is_monotone_increasing: false
+    - calibration_length: 400
+      snr_db: '-5'
+      gains_by_budget:
+        '0.1': 0.001622922809476876
+        '0.2': 0.003667434368150918
+        '0.3': 0.0013558229325753679
+        '0.5': 0.002647068129656693
+      is_monotone_increasing: false
+    - calibration_length: 400
+      snr_db: '0'
+      gains_by_budget:
+        '0.1': 0.003169054858536524
+        '0.2': 0.006306290977652562
+        '0.3': 0.006332854206470462
+        '0.5': 0.0035609889996887746
+      is_monotone_increasing: false
+    - calibration_length: 400
+      snr_db: '10'
+      gains_by_budget:
+        '0.1': 0.006457844415318598
+        '0.2': 0.004757058787026552
+        '0.3': 0.0060152718695707375
+        '0.5': 0.010092500232536827
+      is_monotone_increasing: false
+    - calibration_length: 400
+      snr_db: '20'
+      gains_by_budget:
+        '0.1': 0.0017578698884877675
+        '0.2': 0.003878330978305755
+        '0.3': 0.004585709379064251
+        '0.5': 0.007429595703707848
+      is_monotone_increasing: true
+    - calibration_length: 400
+      snr_db: '5'
+      gains_by_budget:
+        '0.1': 0.002210369564351647
+        '0.2': 0.006629461129453851
+        '0.3': 0.003134632671142412
+        '0.5': 0.0001956316261579216
+      is_monotone_increasing: false
+    caveat: 합성 청취자 코호트에서 얻은 결과이며 임상적 근거가 아닙니다. SNR 과 화자는 코호트 안에서 변하므로 조건 간 비교는 같은 청취자에 대해 짝지어져 있습니다.
+  status: completed
+  finished_at_utc: '2026-08-17T03:15:44.168385+00:00'
+  error: null
+  error_traceback: null
+  notes: 개인화가 유용해지는 최소 교정 길이, 음향 조건과 화자에 대한 견고성, 하위군 붕괴 여부, 예산에 따른 이득의 단조성을 사전등록 격자로 확인합니다.
+- run_id: e22-test-20260817T031708Z-f492557-a64d0b
+  experiment: e22-test
+  started_at_utc: '2026-08-17T03:17:08.404014+00:00'
+  git_sha: f49255756e2a175209b84e3dcb58bf723d4bef2a
+  git_dirty: true
+  lock_hash: fe09e6fa2cefa917
+  env_fingerprint: 7a484db960ff0e820699569ec7fec666e92789bf29d0886992029c62fe553f55
+  env_matches_lock: match
+  python: 3.12.9
+  platform: Darwin arm64
+  seeds:
+  - 3
+  - 4
+  config:
+    name: e22-test
+    description: ''
+    simulation:
+      name: e22-tiny
+      seeds:
+      - 3
+      - 4
+      n_listeners: 14
+      n_calibration_trials: 35
+      n_word_trials: 40
+      snr_conditions_db:
+      - 20.0
+      speakers:
+      - male
+      - female
+      severity:
+        evidence: literature
+        evidence_source: joo2026_error_rates
+        rationale: Group sizes mirror the reference study's design (20 normal / 20 mild / 20 moderate
+          / 12 severe, n=72) so that the simulated cohort has a comparable shape. This fixes the *proportions*,
+          not any listener's behaviour.
+        scheme: korean_study_4group
+        weights:
+          normal: 20.0
+          mild: 20.0
+          moderate: 20.0
+          severe: 12.0
+      audiogram:
+        evidence: clinical_convention
+        evidence_source: null
+        rationale: Age-related hearing loss in older adults characteristically slopes downward toward
+          high frequencies. The stratum PTA windows follow the named severity scheme; the slope and noise
+          magnitudes are chosen to produce realistic-looking but not evidence-derived audiogram shapes.
+        pta_window_db:
+          normal:
+          - 5.0
+          - 19.0
+          mild:
+          - 20.0
+          - 34.0
+          moderate:
+          - 35.0
+          - 49.0
+          moderately_severe:
+          - 50.0
+          - 64.0
+          severe:
+          - 65.0
+          - 85.0
+          profound:
+          - 86.0
+          - 100.0
+        slope_db_per_octave_mean: 6.0
+        slope_db_per_octave_sd: 3.0
+        threshold_noise_db_sd: 4.0
+        interaural_asymmetry_db_sd: 5.0
+        pta_method: pta4_500_1000_2000_4000
+      speech:
+        evidence: literature
+        evidence_source: joo2026_error_rates
+        rationale: Monosyllable correct-response rates per hearing group are anchored to the reference
+          study's reported total error rates (normal 18.3 %, mild 27.8 %, moderate 48.4 %, severe 80.4
+          % errors at MCL over 726 monosyllables), i.e. correct rates of 81.7 / 72.2 / 51.6 / 19.6 %.
+          SRT-PTA agreement is a clinical convention rather than a finding. The within-group spread is
+          an assumption.
+        accuracy_by_stratum:
+          normal: 0.817
+          mild: 0.722
+          moderate: 0.516
+          moderately_severe: 0.4
+          severe: 0.196
+          profound: 0.1
+        ability_sd_logit: 0.55
+        srt_minus_pta_mean_db: 0.0
+        srt_minus_pta_sd_db: 5.0
+        wrs_n_words: 50
+        pbmax_increment_mean: 6.0
+        pbmax_increment_sd: 4.0
+        p_has_pi_function: 0.5
+        p_has_loudness: 0.6
+        mcl_above_pta_db: 30.0
+        mcl_sd_db: 6.0
+        dynamic_range_db_mean: 30.0
+        dynamic_range_db_sd: 8.0
+      confusion:
+        evidence: literature
+        evidence_source: ma2026_similarity
+        rationale: The reference study reports that perceptual distance between phonemes shrinks as hearing
+          loss increases (onset 5.43 -> 3.05, nucleus 5.51 -> 3.53, coda 5.78 -> 3.66 from normal to severe)
+          and that confusions concentrate within phonetic classes. This motivates (a) within-class concentration
+          via a similarity kernel and (b) a concentration parameter that rises with severity. The specific
+          beta values and the Dirichlet concentration are assumptions.
+        position_difficulty:
+          onset: 1.15
+          nucleus: 0.7
+          coda: 1.15
+        similarity_beta_normal: 1.5
+        similarity_beta_severe: 4.0
+        dirichlet_concentration: 40.0
+        no_response_share: 0.05
+      trials:
+        evidence: assumption
+        evidence_source: null
+        rationale: 'Lexical repair, word-length effects and SNR effects are declared assumptions with
+          no numeric source. Their purpose is twofold. First, they make the generative process differ
+          structurally from the phoneme-independence scoring model, so that comparing the two is informative
+          rather than circular. Second, they bridge the gap between the context-free monosyllable task
+          the literature measures and the connected speech AUDIRE captions: a listener who misses one
+          segment of a word in running speech often still identifies it. The resulting word-level mishearing
+          base rate is therefore a CONFIGURED property of the simulation, is reported in every cohort
+          summary, and is swept explicitly in the sensitivity study rather than treated as a fixed fact.'
+        lexical_repair_base: 0.55
+        lexical_repair_per_extra_syllable: 0.12
+        lexical_repair_max: 0.9
+        lexical_repair_multi_error: 0.15
+        snr_logit_per_db: 0.06
+        reference_snr_db: 20.0
+        speaker_effects:
+          male: -0.1
+          female: 0.1
+          synthetic_tts: 0.0
+      words:
+        evidence: assumption
+        evidence_source: null
+        rationale: The synthetic word generator samples syllable counts from a distribution that resembles
+          Korean eojeol length in running text but is not measured from a corpus. Use `source='zeroth'`
+          to draw words from the CC BY-licensed Zeroth-Korean transcripts instead when a real distribution
+          matters.
+        source: synthetic
+        syllable_count_weights:
+          '1': 0.2
+          '2': 0.45
+          '3': 0.25
+          '4': 0.1
+        vocabulary_size: 400
+    models:
+    - logistic
+    - residual
+    arm: clinical_plus_confusion_rich
+    fallback_arm: clinical_plus_confusion
+    calibrations:
+    - none
+    - platt
+    group_shrinkage: false
+    n_splits: 4
+    n_bootstrap: 0
+    ece_bins: 10
+    budgets:
+    - 0.1
+    - 0.2
+    primary_budget: 0.2
+  data_manifests: {}
+  artifacts:
+  - experiments/artifacts/e22-test-20260817T031708Z-f492557-a64d0b/model_comparison_rows.json
+  - experiments/artifacts/e22-test-20260817T031708Z-f492557-a64d0b/summary.json
+  artifact_digests:
+    experiments/artifacts/e22-test-20260817T031708Z-f492557-a64d0b/model_comparison_rows.json: 976c266123eab032e07f290c48f470ab9fdba9ced0a0259e00a4e81dd347f8a9
+    experiments/artifacts/e22-test-20260817T031708Z-f492557-a64d0b/summary.json: 208df41fc27ef1473f7965901552f6cdbce0905323c182135ea68d819b8c6a01
+  metrics:
+    primary_budget: 0.2
+    n_candidates: 4
+    n_candidates_beating_word_length_on_every_seed: 0
+    best_candidate: null
+    reference_logistic:
+      gain_over_word_length: -0.015902940645859634
+      recall_at_0.2: 0.23416922244272054
+      n_seeds_beating_word_length: 1
+    vs_reference_logistic: null
+    best_beats_reference_logistic: null
+    caveat: 합성 청취자 코호트에서 얻은 결과이며 임상적 근거가 아닙니다. 로지스틱 회귀는 ADR-0012 에 따라 참조 기저선으로 유지되며, 여기서의 우위만으로 교체되지 않습니다.
+  status: completed
+  finished_at_utc: '2026-08-17T03:17:15.437781+00:00'
+  error: null
+  error_traceback: null
+  notes: ''
+- run_id: e22-test-20260817T031717Z-f492557-dae3da
+  experiment: e22-test
+  started_at_utc: '2026-08-17T03:17:17.091102+00:00'
+  git_sha: f49255756e2a175209b84e3dcb58bf723d4bef2a
+  git_dirty: true
+  lock_hash: fe09e6fa2cefa917
+  env_fingerprint: 7a484db960ff0e820699569ec7fec666e92789bf29d0886992029c62fe553f55
+  env_matches_lock: match
+  python: 3.12.9
+  platform: Darwin arm64
+  seeds:
+  - 3
+  - 4
+  config:
+    name: e22-test
+    description: ''
+    simulation:
+      name: e22-tiny
+      seeds:
+      - 3
+      - 4
+      n_listeners: 14
+      n_calibration_trials: 35
+      n_word_trials: 40
+      snr_conditions_db:
+      - 20.0
+      speakers:
+      - male
+      - female
+      severity:
+        evidence: literature
+        evidence_source: joo2026_error_rates
+        rationale: Group sizes mirror the reference study's design (20 normal / 20 mild / 20 moderate
+          / 12 severe, n=72) so that the simulated cohort has a comparable shape. This fixes the *proportions*,
+          not any listener's behaviour.
+        scheme: korean_study_4group
+        weights:
+          normal: 20.0
+          mild: 20.0
+          moderate: 20.0
+          severe: 12.0
+      audiogram:
+        evidence: clinical_convention
+        evidence_source: null
+        rationale: Age-related hearing loss in older adults characteristically slopes downward toward
+          high frequencies. The stratum PTA windows follow the named severity scheme; the slope and noise
+          magnitudes are chosen to produce realistic-looking but not evidence-derived audiogram shapes.
+        pta_window_db:
+          normal:
+          - 5.0
+          - 19.0
+          mild:
+          - 20.0
+          - 34.0
+          moderate:
+          - 35.0
+          - 49.0
+          moderately_severe:
+          - 50.0
+          - 64.0
+          severe:
+          - 65.0
+          - 85.0
+          profound:
+          - 86.0
+          - 100.0
+        slope_db_per_octave_mean: 6.0
+        slope_db_per_octave_sd: 3.0
+        threshold_noise_db_sd: 4.0
+        interaural_asymmetry_db_sd: 5.0
+        pta_method: pta4_500_1000_2000_4000
+      speech:
+        evidence: literature
+        evidence_source: joo2026_error_rates
+        rationale: Monosyllable correct-response rates per hearing group are anchored to the reference
+          study's reported total error rates (normal 18.3 %, mild 27.8 %, moderate 48.4 %, severe 80.4
+          % errors at MCL over 726 monosyllables), i.e. correct rates of 81.7 / 72.2 / 51.6 / 19.6 %.
+          SRT-PTA agreement is a clinical convention rather than a finding. The within-group spread is
+          an assumption.
+        accuracy_by_stratum:
+          normal: 0.817
+          mild: 0.722
+          moderate: 0.516
+          moderately_severe: 0.4
+          severe: 0.196
+          profound: 0.1
+        ability_sd_logit: 0.55
+        srt_minus_pta_mean_db: 0.0
+        srt_minus_pta_sd_db: 5.0
+        wrs_n_words: 50
+        pbmax_increment_mean: 6.0
+        pbmax_increment_sd: 4.0
+        p_has_pi_function: 0.5
+        p_has_loudness: 0.6
+        mcl_above_pta_db: 30.0
+        mcl_sd_db: 6.0
+        dynamic_range_db_mean: 30.0
+        dynamic_range_db_sd: 8.0
+      confusion:
+        evidence: literature
+        evidence_source: ma2026_similarity
+        rationale: The reference study reports that perceptual distance between phonemes shrinks as hearing
+          loss increases (onset 5.43 -> 3.05, nucleus 5.51 -> 3.53, coda 5.78 -> 3.66 from normal to severe)
+          and that confusions concentrate within phonetic classes. This motivates (a) within-class concentration
+          via a similarity kernel and (b) a concentration parameter that rises with severity. The specific
+          beta values and the Dirichlet concentration are assumptions.
+        position_difficulty:
+          onset: 1.15
+          nucleus: 0.7
+          coda: 1.15
+        similarity_beta_normal: 1.5
+        similarity_beta_severe: 4.0
+        dirichlet_concentration: 40.0
+        no_response_share: 0.05
+      trials:
+        evidence: assumption
+        evidence_source: null
+        rationale: 'Lexical repair, word-length effects and SNR effects are declared assumptions with
+          no numeric source. Their purpose is twofold. First, they make the generative process differ
+          structurally from the phoneme-independence scoring model, so that comparing the two is informative
+          rather than circular. Second, they bridge the gap between the context-free monosyllable task
+          the literature measures and the connected speech AUDIRE captions: a listener who misses one
+          segment of a word in running speech often still identifies it. The resulting word-level mishearing
+          base rate is therefore a CONFIGURED property of the simulation, is reported in every cohort
+          summary, and is swept explicitly in the sensitivity study rather than treated as a fixed fact.'
+        lexical_repair_base: 0.55
+        lexical_repair_per_extra_syllable: 0.12
+        lexical_repair_max: 0.9
+        lexical_repair_multi_error: 0.15
+        snr_logit_per_db: 0.06
+        reference_snr_db: 20.0
+        speaker_effects:
+          male: -0.1
+          female: 0.1
+          synthetic_tts: 0.0
+      words:
+        evidence: assumption
+        evidence_source: null
+        rationale: The synthetic word generator samples syllable counts from a distribution that resembles
+          Korean eojeol length in running text but is not measured from a corpus. Use `source='zeroth'`
+          to draw words from the CC BY-licensed Zeroth-Korean transcripts instead when a real distribution
+          matters.
+        source: synthetic
+        syllable_count_weights:
+          '1': 0.2
+          '2': 0.45
+          '3': 0.25
+          '4': 0.1
+        vocabulary_size: 400
+    models:
+    - lambdamart
+    arm: clinical_plus_confusion_rich
+    fallback_arm: clinical_plus_confusion
+    calibrations:
+    - none
+    group_shrinkage: false
+    n_splits: 4
+    n_bootstrap: 0
+    ece_bins: 10
+    budgets:
+    - 0.1
+    - 0.2
+    primary_budget: 0.2
+  data_manifests: {}
+  artifacts:
+  - experiments/artifacts/e22-test-20260817T031717Z-f492557-dae3da/model_comparison_rows.json
+  - experiments/artifacts/e22-test-20260817T031717Z-f492557-dae3da/summary.json
+  artifact_digests:
+    experiments/artifacts/e22-test-20260817T031717Z-f492557-dae3da/model_comparison_rows.json: bbb87c9344acee974fdaaffc508b4f472a0fac3787c9685db083dd4122fcbe50
+    experiments/artifacts/e22-test-20260817T031717Z-f492557-dae3da/summary.json: 4bfd23c7a5c0faf94969e28cbccdb684da0e14a590a184ef3af5aef88a7d4154
+  metrics:
+    primary_budget: 0.2
+    n_candidates: 1
+    n_candidates_beating_word_length_on_every_seed: 0
+    best_candidate: null
+    reference_logistic: null
+    vs_reference_logistic: null
+    best_beats_reference_logistic: null
+    caveat: 합성 청취자 코호트에서 얻은 결과이며 임상적 근거가 아닙니다. 로지스틱 회귀는 ADR-0012 에 따라 참조 기저선으로 유지되며, 여기서의 우위만으로 교체되지 않습니다.
+  status: completed
+  finished_at_utc: '2026-08-17T03:17:22.342405+00:00'
+  error: null
+  error_traceback: null
+  notes: ''
+- run_id: e25-test-20260817T031745Z-f492557-a3c658
+  experiment: e25-test
+  started_at_utc: '2026-08-17T03:17:45.781820+00:00'
+  git_sha: f49255756e2a175209b84e3dcb58bf723d4bef2a
+  git_dirty: true
+  lock_hash: fe09e6fa2cefa917
+  env_fingerprint: 7a484db960ff0e820699569ec7fec666e92789bf29d0886992029c62fe553f55
+  env_matches_lock: match
+  python: 3.12.9
+  platform: Darwin arm64
+  seeds:
+  - 1
+  - 2
+  config:
+    name: e25-test
+    description: ''
+    base_simulation:
+      name: e25-tiny
+      seeds:
+      - 1
+      - 2
+      n_listeners: 12
+      n_calibration_trials: 20
+      n_word_trials: 30
+      snr_conditions_db:
+      - 20.0
+      speakers:
+      - male
+      - female
+      severity:
+        evidence: literature
+        evidence_source: joo2026_error_rates
+        rationale: Group sizes mirror the reference study's design (20 normal / 20 mild / 20 moderate
+          / 12 severe, n=72) so that the simulated cohort has a comparable shape. This fixes the *proportions*,
+          not any listener's behaviour.
+        scheme: korean_study_4group
+        weights:
+          normal: 20.0
+          mild: 20.0
+          moderate: 20.0
+          severe: 12.0
+      audiogram:
+        evidence: clinical_convention
+        evidence_source: null
+        rationale: Age-related hearing loss in older adults characteristically slopes downward toward
+          high frequencies. The stratum PTA windows follow the named severity scheme; the slope and noise
+          magnitudes are chosen to produce realistic-looking but not evidence-derived audiogram shapes.
+        pta_window_db:
+          normal:
+          - 5.0
+          - 19.0
+          mild:
+          - 20.0
+          - 34.0
+          moderate:
+          - 35.0
+          - 49.0
+          moderately_severe:
+          - 50.0
+          - 64.0
+          severe:
+          - 65.0
+          - 85.0
+          profound:
+          - 86.0
+          - 100.0
+        slope_db_per_octave_mean: 6.0
+        slope_db_per_octave_sd: 3.0
+        threshold_noise_db_sd: 4.0
+        interaural_asymmetry_db_sd: 5.0
+        pta_method: pta4_500_1000_2000_4000
+      speech:
+        evidence: literature
+        evidence_source: joo2026_error_rates
+        rationale: Monosyllable correct-response rates per hearing group are anchored to the reference
+          study's reported total error rates (normal 18.3 %, mild 27.8 %, moderate 48.4 %, severe 80.4
+          % errors at MCL over 726 monosyllables), i.e. correct rates of 81.7 / 72.2 / 51.6 / 19.6 %.
+          SRT-PTA agreement is a clinical convention rather than a finding. The within-group spread is
+          an assumption.
+        accuracy_by_stratum:
+          normal: 0.817
+          mild: 0.722
+          moderate: 0.516
+          moderately_severe: 0.4
+          severe: 0.196
+          profound: 0.1
+        ability_sd_logit: 0.55
+        srt_minus_pta_mean_db: 0.0
+        srt_minus_pta_sd_db: 5.0
+        wrs_n_words: 50
+        pbmax_increment_mean: 6.0
+        pbmax_increment_sd: 4.0
+        p_has_pi_function: 0.5
+        p_has_loudness: 0.6
+        mcl_above_pta_db: 30.0
+        mcl_sd_db: 6.0
+        dynamic_range_db_mean: 30.0
+        dynamic_range_db_sd: 8.0
+      confusion:
+        evidence: literature
+        evidence_source: ma2026_similarity
+        rationale: The reference study reports that perceptual distance between phonemes shrinks as hearing
+          loss increases (onset 5.43 -> 3.05, nucleus 5.51 -> 3.53, coda 5.78 -> 3.66 from normal to severe)
+          and that confusions concentrate within phonetic classes. This motivates (a) within-class concentration
+          via a similarity kernel and (b) a concentration parameter that rises with severity. The specific
+          beta values and the Dirichlet concentration are assumptions.
+        position_difficulty:
+          onset: 1.15
+          nucleus: 0.7
+          coda: 1.15
+        similarity_beta_normal: 1.5
+        similarity_beta_severe: 4.0
+        dirichlet_concentration: 40.0
+        no_response_share: 0.05
+      trials:
+        evidence: assumption
+        evidence_source: null
+        rationale: 'Lexical repair, word-length effects and SNR effects are declared assumptions with
+          no numeric source. Their purpose is twofold. First, they make the generative process differ
+          structurally from the phoneme-independence scoring model, so that comparing the two is informative
+          rather than circular. Second, they bridge the gap between the context-free monosyllable task
+          the literature measures and the connected speech AUDIRE captions: a listener who misses one
+          segment of a word in running speech often still identifies it. The resulting word-level mishearing
+          base rate is therefore a CONFIGURED property of the simulation, is reported in every cohort
+          summary, and is swept explicitly in the sensitivity study rather than treated as a fixed fact.'
+        lexical_repair_base: 0.55
+        lexical_repair_per_extra_syllable: 0.12
+        lexical_repair_max: 0.9
+        lexical_repair_multi_error: 0.15
+        snr_logit_per_db: 0.06
+        reference_snr_db: 20.0
+        speaker_effects:
+          male: -0.1
+          female: 0.1
+          synthetic_tts: 0.0
+      words:
+        evidence: assumption
+        evidence_source: null
+        rationale: The synthetic word generator samples syllable counts from a distribution that resembles
+          Korean eojeol length in running text but is not measured from a corpus. Use `source='zeroth'`
+          to draw words from the CC BY-licensed Zeroth-Korean transcripts instead when a real distribution
+          matters.
+        source: synthetic
+        syllable_count_weights:
+          '1': 0.2
+          '2': 0.45
+          '3': 0.25
+          '4': 0.1
+        vocabulary_size: 400
+    calibration_lengths:
+    - 10
+    - 40
+    snr_conditions_db:
+    - 20.0
+    - 0.0
+    arm: clinical_plus_confusion
+    reference_arm: clinical
+    model: logistic
+    n_splits: 3
+    n_bootstrap: 0
+    ece_bins: 10
+    budgets:
+    - 0.1
+    - 0.2
+    primary_budget: 0.2
+  data_manifests: {}
+  artifacts:
+  - experiments/artifacts/e25-test-20260817T031745Z-f492557-a3c658/validation_sweep_rows.json
+  - experiments/artifacts/e25-test-20260817T031745Z-f492557-a3c658/summary.json
+  artifact_digests:
+    experiments/artifacts/e25-test-20260817T031745Z-f492557-a3c658/validation_sweep_rows.json: a99b69e4582a94adb9dc735e823b74ed70b648c38412d2887cec31405b2b338e
+    experiments/artifacts/e25-test-20260817T031745Z-f492557-a3c658/summary.json: b19235461c8f4b3ede104a0b0c1ca184856433b399a1ffa7209f4a7ac20cd11b
+  metrics:
+    primary_budget: 0.2
+    overall_vs_within_condition_gain:
+    - calibration_length: 10
+      gain_overall: 0.04272070211667525
+      gain_within_condition_mean: -0.04343139383412941
+      gain_within_condition_min: -0.0718627876682588
+    - calibration_length: 40
+      gain_overall: 0.05431816505642009
+      gain_within_condition_mean: -0.01139833711262285
+      gain_within_condition_min: -0.012592592592592627
+    n_declared_cells: 4
+    calibration_lengths:
+    - 10
+    - 40
+    snr_conditions_db:
+    - 20.0
+    - 0.0
+    min_calibration_beating_word_length_on_every_seed: 10
+    budget_monotonicity:
+    - calibration_length: 10
+      gains_by_budget:
+        '0.1': 0.025020281731691116
+        '0.2': 0.04272070211667525
+      is_monotone_increasing: true
+    - calibration_length: 40
+      gains_by_budget:
+        '0.1': 0.02380337783022346
+        '0.2': 0.05431816505642009
+      is_monotone_increasing: true
+    n_budget_conditions_non_monotone: 0
+    budget_monotonicity_within_snr:
+    - calibration_length: 10
+      snr_db: '0'
+      gains_by_budget:
+        '0.1': -0.01370370370370369
+        '0.2': -0.015000000000000013
+      is_monotone_increasing: false
+    - calibration_length: 10
+      snr_db: '20'
+      gains_by_budget:
+        '0.1': -0.030612244897959183
+        '0.2': -0.0718627876682588
+      is_monotone_increasing: false
+    - calibration_length: 40
+      snr_db: '0'
+      gains_by_budget:
+        '0.1': -0.03611111111111111
+        '0.2': -0.012592592592592627
+      is_monotone_increasing: true
+    - calibration_length: 40
+      snr_db: '20'
+      gains_by_budget:
+        '0.1': 0.0
+        '0.2': -0.010204081632653073
+      is_monotone_increasing: false
+    caveat: 합성 청취자 코호트에서 얻은 결과이며 임상적 근거가 아닙니다. SNR 과 화자는 코호트 안에서 변하므로 조건 간 비교는 같은 청취자에 대해 짝지어져 있습니다.
+  status: completed
+  finished_at_utc: '2026-08-17T03:17:47.797045+00:00'
+  error: null
+  error_traceback: null
+  notes: ''
+- run_id: e25-missing-20260817T031749Z-f492557-fc6063
+  experiment: e25-missing
+  started_at_utc: '2026-08-17T03:17:49.471619+00:00'
+  git_sha: f49255756e2a175209b84e3dcb58bf723d4bef2a
+  git_dirty: true
+  lock_hash: fe09e6fa2cefa917
+  env_fingerprint: 7a484db960ff0e820699569ec7fec666e92789bf29d0886992029c62fe553f55
+  env_matches_lock: match
+  python: 3.12.9
+  platform: Darwin arm64
+  seeds:
+  - 1
+  - 2
+  config:
+    name: e25-missing
+    description: ''
+    base_simulation:
+      name: e25-tiny
+      seeds:
+      - 1
+      - 2
+      n_listeners: 12
+      n_calibration_trials: 20
+      n_word_trials: 30
+      snr_conditions_db:
+      - 20.0
+      speakers:
+      - male
+      - female
+      severity:
+        evidence: literature
+        evidence_source: joo2026_error_rates
+        rationale: Group sizes mirror the reference study's design (20 normal / 20 mild / 20 moderate
+          / 12 severe, n=72) so that the simulated cohort has a comparable shape. This fixes the *proportions*,
+          not any listener's behaviour.
+        scheme: korean_study_4group
+        weights:
+          normal: 20.0
+          mild: 20.0
+          moderate: 20.0
+          severe: 12.0
+      audiogram:
+        evidence: clinical_convention
+        evidence_source: null
+        rationale: Age-related hearing loss in older adults characteristically slopes downward toward
+          high frequencies. The stratum PTA windows follow the named severity scheme; the slope and noise
+          magnitudes are chosen to produce realistic-looking but not evidence-derived audiogram shapes.
+        pta_window_db:
+          normal:
+          - 5.0
+          - 19.0
+          mild:
+          - 20.0
+          - 34.0
+          moderate:
+          - 35.0
+          - 49.0
+          moderately_severe:
+          - 50.0
+          - 64.0
+          severe:
+          - 65.0
+          - 85.0
+          profound:
+          - 86.0
+          - 100.0
+        slope_db_per_octave_mean: 6.0
+        slope_db_per_octave_sd: 3.0
+        threshold_noise_db_sd: 4.0
+        interaural_asymmetry_db_sd: 5.0
+        pta_method: pta4_500_1000_2000_4000
+      speech:
+        evidence: literature
+        evidence_source: joo2026_error_rates
+        rationale: Monosyllable correct-response rates per hearing group are anchored to the reference
+          study's reported total error rates (normal 18.3 %, mild 27.8 %, moderate 48.4 %, severe 80.4
+          % errors at MCL over 726 monosyllables), i.e. correct rates of 81.7 / 72.2 / 51.6 / 19.6 %.
+          SRT-PTA agreement is a clinical convention rather than a finding. The within-group spread is
+          an assumption.
+        accuracy_by_stratum:
+          normal: 0.817
+          mild: 0.722
+          moderate: 0.516
+          moderately_severe: 0.4
+          severe: 0.196
+          profound: 0.1
+        ability_sd_logit: 0.55
+        srt_minus_pta_mean_db: 0.0
+        srt_minus_pta_sd_db: 5.0
+        wrs_n_words: 50
+        pbmax_increment_mean: 6.0
+        pbmax_increment_sd: 4.0
+        p_has_pi_function: 0.5
+        p_has_loudness: 0.6
+        mcl_above_pta_db: 30.0
+        mcl_sd_db: 6.0
+        dynamic_range_db_mean: 30.0
+        dynamic_range_db_sd: 8.0
+      confusion:
+        evidence: literature
+        evidence_source: ma2026_similarity
+        rationale: The reference study reports that perceptual distance between phonemes shrinks as hearing
+          loss increases (onset 5.43 -> 3.05, nucleus 5.51 -> 3.53, coda 5.78 -> 3.66 from normal to severe)
+          and that confusions concentrate within phonetic classes. This motivates (a) within-class concentration
+          via a similarity kernel and (b) a concentration parameter that rises with severity. The specific
+          beta values and the Dirichlet concentration are assumptions.
+        position_difficulty:
+          onset: 1.15
+          nucleus: 0.7
+          coda: 1.15
+        similarity_beta_normal: 1.5
+        similarity_beta_severe: 4.0
+        dirichlet_concentration: 40.0
+        no_response_share: 0.05
+      trials:
+        evidence: assumption
+        evidence_source: null
+        rationale: 'Lexical repair, word-length effects and SNR effects are declared assumptions with
+          no numeric source. Their purpose is twofold. First, they make the generative process differ
+          structurally from the phoneme-independence scoring model, so that comparing the two is informative
+          rather than circular. Second, they bridge the gap between the context-free monosyllable task
+          the literature measures and the connected speech AUDIRE captions: a listener who misses one
+          segment of a word in running speech often still identifies it. The resulting word-level mishearing
+          base rate is therefore a CONFIGURED property of the simulation, is reported in every cohort
+          summary, and is swept explicitly in the sensitivity study rather than treated as a fixed fact.'
+        lexical_repair_base: 0.55
+        lexical_repair_per_extra_syllable: 0.12
+        lexical_repair_max: 0.9
+        lexical_repair_multi_error: 0.15
+        snr_logit_per_db: 0.06
+        reference_snr_db: 20.0
+        speaker_effects:
+          male: -0.1
+          female: 0.1
+          synthetic_tts: 0.0
+      words:
+        evidence: assumption
+        evidence_source: null
+        rationale: The synthetic word generator samples syllable counts from a distribution that resembles
+          Korean eojeol length in running text but is not measured from a corpus. Use `source='zeroth'`
+          to draw words from the CC BY-licensed Zeroth-Korean transcripts instead when a real distribution
+          matters.
+        source: synthetic
+        syllable_count_weights:
+          '1': 0.2
+          '2': 0.45
+          '3': 0.25
+          '4': 0.1
+        vocabulary_size: 400
+    calibration_lengths:
+    - 10
+    - 40
+    snr_conditions_db:
+    - 20.0
+    - 0.0
+    arm: clinical_plus_confusion
+    reference_arm: clinical
+    model: logistic
+    n_splits: 3
+    n_bootstrap: 0
+    ece_bins: 10
+    budgets:
+    - 0.1
+    - 0.2
+    primary_budget: 0.2
+  data_manifests: {}
+  artifacts: []
+  artifact_digests: {}
+  metrics: {}
+  status: failed
+  finished_at_utc: '2026-08-17T03:17:50.689384+00:00'
+  error: 'RuntimeError: 코호트 생성 실패'
+  error_traceback: "Traceback (most recent call last):\n  File \"/Users/jaeminahn/Desktop/development/Audire/src/audire/experiments/registry.py\"\
+    , line 395, in tracked_run\n    yield record\n  File \"/Users/jaeminahn/Desktop/development/Audire/src/audire/experiments/validation_sweep.py\"\
+    , line 260, in run_validation_sweep\n    return _execute(cfg, rec)\n           ^^^^^^^^^^^^^^^^^^\n\
+    \  File \"/Users/jaeminahn/Desktop/development/Audire/src/audire/experiments/validation_sweep.py\"\
+    , line 284, in _execute\n    cohort = build_cohort(sim, seed)\n             ^^^^^^^^^^^^^^^^^^^^^^^\n\
     \  File \"/Users/jaeminahn/Desktop/development/Audire/tests/unit/test_validation_sweep.py\", line\
     \ 91, in flaky\n    raise RuntimeError(\"코호트 생성 실패\")\nRuntimeError: 코호트 생성 실패\n"
   notes: ''
