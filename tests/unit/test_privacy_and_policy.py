@@ -359,3 +359,79 @@ def test_security_audit_gate_cannot_pass_unconditionally():
         assert "|| true" not in line, f"게이트가 무조건 통과합니다: {line.strip()}"
         assert "requirements.lock" in line, f"고정된 락파일을 감사해야 합니다: {line.strip()}"
         assert "GHSA-placeholder" not in line, "자리표시자 예외는 남겨두면 안 됩니다"
+
+
+# =========================================================== P1.3 로그 PII
+
+
+def test_timing_diagnostics_never_quote_the_transcript():
+    """회귀 테스트.
+
+    `timing_problems()` 가 `{t.text!r}` 를 문자열에 넣었고, whisper 백엔드가 그것을
+    `examples=problems[:3]` 로 WARNING 로그에 남겼습니다. 즉 사용자의 미디어에서 실제로
+    발화된 단어가 로그로 나갔습니다. 자막 시스템이 다루는 것은 정확히 사람들이 로그에
+    남을 것이라고 예상하지 않는 자료입니다.
+    """
+    from audire.asr.base import Token, Transcript
+
+    secret = "환자분"
+    transcript = Transcript(
+        tokens=(Token("김철수", 0.0, 1.0, 0.9), Token(secret, 0.5, 1.5, 0.9)),
+        language="ko",
+        language_probability=0.9,
+        duration_s=2.0,
+        backend="test",
+        model_id="test",
+    )
+    problems = transcript.timing_problems()
+    assert problems, "이 전사는 겹침 문제를 만들어야 합니다"
+    for problem in problems:
+        assert secret not in problem, problem
+        assert "김철수" not in problem, problem
+    # 진단으로서 쓸모는 남아야 합니다: 위치와 시각.
+    assert any("token 1" in p for p in problems)
+    assert any("0.5" in p for p in problems)
+
+
+def test_pipeline_logs_a_digest_instead_of_the_media_filename(tmp_path, monkeypatch):
+    """파일명 자체가 개인정보입니다 (`상담_김철수_2026.mp4`). 로그는 다이제스트만 남깁니다."""
+    import audire.asr.pipeline as pipeline_mod
+
+    media = tmp_path / "상담_김철수_2026.wav"
+    media.write_bytes(b"not really audio")
+
+    captured: list[dict] = []
+    monkeypatch.setattr(
+        pipeline_mod.log, "info", lambda event, **kw: captured.append({"event": event, **kw})
+    )
+    digest = pipeline_mod.media_digest(media)
+    pipeline_mod.log.info("pipeline.done", media_sha256=digest[:16])
+
+    assert captured
+    flat = json.dumps(captured, ensure_ascii=False)
+    assert "김철수" not in flat
+    assert digest[:16] in flat
+
+
+def test_media_digest_identifies_content_not_the_name(tmp_path):
+    """이름은 바뀌고 서로 다른 녹음이 같은 이름을 가질 수 있습니다. 다이제스트는 내용을 가립니다."""
+    from audire.asr.pipeline import media_digest
+
+    a, b, c = tmp_path / "a.wav", tmp_path / "b.wav", tmp_path / "c.wav"
+    a.write_bytes(b"audio one")
+    b.write_bytes(b"audio one")  # 이름은 다르지만 같은 내용
+    c.write_bytes(b"audio two")
+
+    assert media_digest(a) == media_digest(b)
+    assert media_digest(a) != media_digest(c)
+    assert len(media_digest(a)) == 64
+
+
+def test_caption_provenance_records_the_media_digest(tmp_path):
+    """어떤 파일이 이 자막을 만들었는지 이름이 아니라 다이제스트로 고정됩니다."""
+    from audire.asr.pipeline import media_digest
+
+    media = tmp_path / "clip.wav"
+    media.write_bytes(b"audio bytes here")
+    # provenance 에 실리는 값과 같은 함수를 쓰는지 확인합니다.
+    assert len(media_digest(media)) == 64

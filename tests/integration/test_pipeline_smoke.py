@@ -348,8 +348,10 @@ def test_transcript_detects_overlapping_and_out_of_order_tokens() -> None:
         model_id="test",
     )
     problems = bad.timing_problems()
-    assert any("overlaps" in p for p in problems)
-    assert any("starts before the previous token" in p for p in problems)
+    assert any("overlapping token" in p for p in problems)
+    assert any("before token" in p for p in problems)
+    # 진단 문자열은 로그로 나가므로 전사 내용을 담아서는 안 됩니다.
+    assert not any(t.text in p for p in problems for t in bad.tokens), problems
 
 
 def test_token_validates_timing_and_confidence() -> None:

@@ -95,15 +95,31 @@ class Transcript:
         Word timestamps are estimated, so overlap and non-monotonicity do occur. They must
         be visible: a caption built on bad timing is a usability failure, and E7 tracks
         timestamp quality separately from recognition accuracy.
+
+        These strings are logged (``asr.timing_problems``), so they carry the token
+        **index and times only, never its text**. An earlier version interpolated
+        ``{t.text!r}``, which put the words actually spoken in the user's media into a
+        WARNING log line — and a captioning system processes exactly the material people
+        do not expect to be logged. The transcript itself still holds the text for anyone
+        who legitimately has the data; a diagnostic does not need it to be actionable.
         """
         problems: list[str] = []
         for i, t in enumerate(self.tokens):
             if t.end_s > self.duration_s + 0.5:
-                problems.append(f"token {i} ({t.text!r}) ends past the media duration")
+                problems.append(
+                    f"token {i} ends at {t.end_s:.3f}s, past the media duration "
+                    f"{self.duration_s:.3f}s"
+                )
             if i and t.start_s < self.tokens[i - 1].start_s:
-                problems.append(f"token {i} ({t.text!r}) starts before the previous token")
+                problems.append(
+                    f"token {i} starts at {t.start_s:.3f}s, before token {i - 1} "
+                    f"at {self.tokens[i - 1].start_s:.3f}s"
+                )
             if i and t.start_s < self.tokens[i - 1].end_s - 1e-6:
-                problems.append(f"token {i} ({t.text!r}) overlaps the previous token")
+                problems.append(
+                    f"token {i} starts at {t.start_s:.3f}s, overlapping token {i - 1} "
+                    f"which ends at {self.tokens[i - 1].end_s:.3f}s"
+                )
         return problems
 
     def to_dict(self) -> dict[str, Any]:

@@ -11,6 +11,7 @@ and the risk model never sees it.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -213,6 +214,22 @@ def score_transcript(
     return out
 
 
+def media_digest(media: Path, *, chunk: int = 1 << 20) -> str:
+    """SHA-256 of a media file, streamed so a large video does not enter memory.
+
+    Serves two purposes. It identifies exactly which file produced a caption, which the
+    filename does not — files get renamed, and two different recordings can share a name.
+    And it gives the logs something to say about the input that is not the filename:
+    ``상담_김철수_2026.mp4`` is itself personal data, and a captioning system handles
+    precisely the material people do not expect to be shipped to a log aggregator.
+    """
+    h = hashlib.sha256()
+    with media.open("rb") as fh:
+        while block := fh.read(chunk):
+            h.update(block)
+    return h.hexdigest()
+
+
 def caption_media(
     media: Path,
     backend: ASRBackend,
@@ -228,7 +245,11 @@ def caption_media(
 ) -> CaptionResult:
     """Run the complete pipeline on one media file."""
     active_policy = policy or FullCaptionPolicy()
+    # After transcription, not before: the backend validates the media and reports a
+    # specific reason when it is unusable. Hashing first replaced that with a bare
+    # FileNotFoundError from this function.
     transcript = backend.transcribe(media, language=language)
+    digest = media_digest(media)
     scored = score_transcript(
         transcript,
         scorer,
@@ -247,6 +268,9 @@ def caption_media(
         policy=active_policy.describe(),
         provenance={
             "media": media.name,
+            # The digest, not the name, is what identifies the input reproducibly.
+            "media_sha256": digest,
+            "media_bytes": media.stat().st_size,
             "asr": backend.describe(),
             "model": scorer.describe(),
             "listener": {
@@ -260,7 +284,8 @@ def caption_media(
     )
     log.info(
         "pipeline.done",
-        media=media.name,
+        # Digest rather than filename: log sinks travel further than the media does.
+        media_sha256=digest[:16],
         n_words=len(words),
         n_shown=result.n_shown,
         caption_ratio=round(result.caption_ratio, 3),
