@@ -14,6 +14,7 @@ Rules enforced here
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -106,7 +107,8 @@ def _fetch_zenodo(source: Source, dest: Path) -> dict[str, Any]:
         if not url:
             continue
         out = dest / key
-        if out.exists() and item.get("size") and out.stat().st_size == int(item["size"]):
+        declared = str(item.get("checksum") or "")
+        if out.exists() and _checksum_matches(out, declared, item.get("size")):
             log.info("fetch.zenodo.skip_existing", file=key)
             continue
         log.info("fetch.zenodo.file", file=key, bytes=item.get("size"))
@@ -117,9 +119,48 @@ def _fetch_zenodo(source: Source, dest: Path) -> dict[str, Any]:
                 for chunk in r.iter_content(1 << 20):
                     if chunk:
                         f.write(chunk)
+        # Verify against the checksum the archive itself publishes, before the file is
+        # put in place. Size alone does not detect corruption, and our own manifest is
+        # computed *from the downloaded bytes* — so a corrupted download would be hashed,
+        # recorded, and then verify cleanly forever against its own corruption.
+        if not _checksum_matches(tmp, declared, item.get("size")):
+            actual = _digest(tmp, declared.split(":", 1)[0] if ":" in declared else "md5")
+            tmp.unlink(missing_ok=True)
+            raise FetchError(
+                f"{source.id}: 내려받은 {key!r} 이 Zenodo 가 공표한 체크섬과 다릅니다 "
+                f"(선언 {declared!r}, 실제 {actual!r}). 손상되었거나 원본이 바뀌었습니다."
+            )
         tmp.replace(out)
 
     return {"backend": "zenodo REST API", "api": api, "live_license": live_license}
+
+
+def _digest(path: Path, algorithm: str) -> str:
+    """``algorithm:hexdigest`` for a file, streamed."""
+    try:
+        h = hashlib.new(algorithm)
+    except ValueError as exc:  # pragma: no cover - unknown algorithm from the API
+        raise FetchError(f"알 수 없는 체크섬 알고리즘: {algorithm!r}") from exc
+    with path.open("rb") as fh:
+        while block := fh.read(1 << 20):
+            h.update(block)
+    return f"{algorithm}:{h.hexdigest()}"
+
+
+def _checksum_matches(path: Path, declared: str, size: Any = None) -> bool:
+    """Whether ``path`` matches the archive's declared checksum.
+
+    Zenodo publishes ``"md5:<hex>"``. When no checksum is published we fall back to the
+    declared size, which is weak but is all the archive gives us — and the fallback is
+    logged as such rather than presented as verification.
+    """
+    if not path.exists():
+        return False
+    if ":" in declared:
+        algorithm = declared.split(":", 1)[0]
+        return _digest(path, algorithm) == declared
+    log.warning("fetch.zenodo.no_published_checksum", file=path.name)
+    return size is not None and path.stat().st_size == int(size)
 
 
 _BACKENDS = {

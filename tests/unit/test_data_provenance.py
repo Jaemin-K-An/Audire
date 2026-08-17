@@ -243,3 +243,54 @@ def test_manifest_roundtrip_preserves_digests(tmp_path: Path) -> None:
     payload = json.loads((tmp_path / "manifests" / "demo.json").read_text(encoding="utf-8"))
     assert payload["content_digest"] == m.content_digest
     assert all(len(f["sha256"]) == 64 for f in payload["files"])
+
+
+# ================================================== 8.5 취득 무결성 (상류 체크섬 대조)
+
+
+def test_zenodo_checksum_detects_corruption_of_the_same_size(tmp_path):
+    """회귀 테스트.
+
+    Zenodo 경로는 파일 **크기만** 비교했습니다. 크기가 같은 손상은 통과하고, 우리 매니페스트는
+    **내려받은 바이트로부터** SHA-256 을 계산하므로 손상된 파일이 그대로 해싱·기록되어
+    이후 검증이 자기 자신의 손상에 대해 영원히 통과합니다.
+    """
+    import hashlib
+
+    from audire.data.fetch import _checksum_matches
+
+    path = tmp_path / "f.bin"
+    path.write_bytes(b"hello world")
+
+    good = f"md5:{hashlib.md5(b'hello world').hexdigest()}"
+    same_size = f"md5:{hashlib.md5(b'HELLO WORLD').hexdigest()}"
+
+    assert _checksum_matches(path, good)
+    assert not _checksum_matches(path, same_size)
+    # 크기 비교만 했다면 통과했을 조건입니다.
+    assert len(b"hello world") == len(b"HELLO WORLD")
+
+
+def test_missing_published_checksum_falls_back_to_size_and_says_so(tmp_path, caplog):
+    """체크섬을 공표하지 않는 파일도 있습니다. 폴백은 검증인 척하면 안 됩니다."""
+    from audire.data.fetch import _checksum_matches
+
+    path = tmp_path / "f.bin"
+    path.write_bytes(b"hello world")
+    assert _checksum_matches(path, "", size=11)
+    assert not _checksum_matches(path, "", size=12)
+
+
+def test_checksum_check_reports_a_missing_file_as_mismatch(tmp_path):
+    from audire.data.fetch import _checksum_matches
+
+    assert not _checksum_matches(tmp_path / "absent.bin", "md5:deadbeef")
+
+
+def test_unknown_checksum_algorithm_is_a_hard_error(tmp_path):
+    from audire.data.fetch import FetchError, _digest
+
+    path = tmp_path / "f.bin"
+    path.write_bytes(b"x")
+    with pytest.raises(FetchError, match="알 수 없는 체크섬"):
+        _digest(path, "not-a-real-algorithm")

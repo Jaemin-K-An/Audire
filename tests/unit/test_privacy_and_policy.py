@@ -435,3 +435,42 @@ def test_caption_provenance_records_the_media_digest(tmp_path):
     media.write_bytes(b"audio bytes here")
     # provenance 에 실리는 값과 같은 함수를 쓰는지 확인합니다.
     assert len(media_digest(media)) == 64
+
+
+def test_integrity_gates_run_independently_of_lint_and_tests():
+    """회귀 테스트.
+
+    프라이버시·출처 게이트가 `quality` 잡의 마지막 두 스텝이었습니다. 스텝이 실패하면 이후
+    스텝이 취소되므로, "참가자 데이터를 커밋했는가" 와 "모든 출처가 라이선스를 선언했는가"
+    는 브랜치 상태가 가장 나쁠 때 정확히 건너뛰어졌습니다. 저장소에서 결과가 가장 무거운
+    검사이므로 독립적으로 보고되어야 합니다.
+    """
+    ci = yaml.safe_load(
+        (repo_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    )
+    jobs = ci["jobs"]
+    assert "integrity" in jobs, "무결성 게이트가 독립 잡이어야 합니다"
+
+    gate_steps = jobs["integrity"]["steps"]
+    commands = " ".join(str(step.get("run", "")) for step in gate_steps)
+    assert "check_repo_hygiene.py" in commands
+    assert "fetch_data.py list" in commands
+
+    # 테스트/린트 잡에 다시 섞여 들어가면 안 됩니다.
+    quality_commands = " ".join(str(s.get("run", "")) for s in jobs["quality"]["steps"])
+    assert "check_repo_hygiene.py" not in quality_commands
+
+    # 게이트끼리도 서로를 가리면 안 됩니다.
+    named = [s for s in gate_steps if "gate" in str(s.get("name", "")).lower()]
+    assert len(named) >= 2
+    assert all(s.get("if") == "always()" for s in named), (
+        "한 게이트의 실패가 다른 게이트의 결과를 가려서는 안 됩니다"
+    )
+
+
+def test_integrity_job_does_not_depend_on_other_jobs():
+    """`needs:` 가 걸리면 상류 잡 실패 시 게이트가 아예 실행되지 않습니다."""
+    ci = yaml.safe_load(
+        (repo_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    )
+    assert "needs" not in ci["jobs"]["integrity"]
