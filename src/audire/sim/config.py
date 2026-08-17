@@ -251,6 +251,81 @@ class WordSourceModel(Evidenced):
     vocabulary_size: int = Field(default=400, ge=10)
 
 
+class LexicalRepairV2(Evidenced):
+    """Simulator V2 의 복구 모형: **무엇을 어떻게 잘못 들었는가**에 조건화합니다.
+
+    V1 의 한계
+    ----------
+    V1 은 복구 확률을 오류 **개수**와 음절 수만으로 정합니다. 그래서 "각→닥" 과 "각→삭" 의
+    결과 분포가 정확히 같고, ``(오류 수, 음절 수)`` 만 아는 오라클이 PR-AUC 0.8307 에
+    도달하는 반면 현재 모델이 이미 0.7884 로 그 95% 에 와 있습니다
+    (``audire.sim.diagnostics``, docs/RESULTS.md §14). 단어 수준 신호가 남아 있지 않습니다.
+
+    처음 시도한 기전과 그것이 실패한 이유
+    -------------------------------------
+    처음에는 **어휘 함정**으로 설계했습니다: 지각형이 실재 단어이면 청자가 오류를 알아채지
+    못해 복구가 드물고, 비단어이면 알아채되 경쟁 이웃이 많을수록 어렵다는 것입니다.
+    측정해 보니 오류가 난 4,878 시행 중 지각형이 어휘에 걸린 경우가 **13건(0.3%)** 뿐이었고,
+    어휘 400단어 중 한 자리 치환 이웃을 가진 단어가 67개에 불과했습니다. 기본 어휘가
+    무작위 합성 음절열이라 "실재 단어" 라는 개념이 성립하지 않는 것이 근본 원인입니다.
+    경쟁자가 거의 항상 0 이므로 이웃 감쇠 항도 상수가 되고, 복구 확률이 다시 오류 개수만의
+    함수로 돌아갑니다. 즉 그 설계로는 V1 의 한계를 그대로 재현합니다.
+
+    채택한 기전
+    -----------
+    대신 **오류 위치와 음운적 거리**에 조건화합니다. 이것은 어휘 밀도와 무관하게 작동하고
+    한국어 음운론에 근거가 있습니다.
+
+    * **종성 오류는 잘 복구됩니다.** 한국어 종성은 7종으로 중화되고 연음·후행 자음에 따라
+      표면형이 달라지므로, 청자는 종성을 문맥에서 재구성하는 데 익숙합니다.
+    * **중성 오류는 잘 복구되지 않습니다.** 모음은 어휘 변별 부담이 크고 중화되지 않습니다.
+    * **같은 부류 안의 치환은 더 잘 복구됩니다.** 평음↔격음(ㄱ↔ㅋ)처럼 조음 위치가 같은
+      혼동은 후보가 좁혀지지만, 부류를 건너뛰면 그렇지 않습니다.
+
+    이 기전이 단어별·청취자별 구조를 만듭니다. 단어마다 종성 비율과 음소 구성이 다르고,
+    청취자마다 어느 위치·어느 부류에서 틀리는지가 다르기 때문입니다.
+
+    순환이 아닌 이유
+    ----------------
+    예측 모델은 음소별 ``p_correct`` 의 곱과 그 집계를 계산합니다. "어느 위치가 틀렸는가"
+    에 가중치를 주거나 "치환이 같은 부류 안이었는가" 를 보는 항이 없습니다. 따라서 이
+    기전은 채점 수식의 재진술이 아니라 모델이 추정해야 할 대상입니다.
+    """
+
+    evidence: Evidence = "assumption"
+    evidence_source: str | None = None
+    rationale: str = (
+        "기전의 **방향**(종성 중화로 인한 높은 복구 가능성, 모음의 큰 어휘 변별 부담, 같은 "
+        "조음 부류 내 혼동의 상대적 회복 용이성)은 한국어 음운론에서 널리 기술되지만, 여기 "
+        "쓰인 **수치**에는 한국어 연결발화에 대한 출처가 없습니다. 따라서 전부 명시적 "
+        "시뮬레이션 가정입니다. 목적은 실제 복구율을 재현하는 것이 아니라, 단어 수준 개인화 "
+        "신호가 **존재할 때** 추정기가 그것을 회복하는지 시험하는 것입니다. V1 은 그대로 "
+        "실행 가능하며 두 생성 과정을 같은 시드로 비교합니다."
+    )
+
+    #: 오류가 하나 있을 때의 기저 복구 확률. 위치·거리 가중치가 여기에 곱해집니다.
+    base_repair: UnitInterval = 0.55
+    #: 위치별 복구 용이도 배수. 종성 > 초성 > 중성.
+    coda_recovery: float = Field(default=1.45, gt=0.0)
+    onset_recovery: float = Field(default=1.00, gt=0.0)
+    nucleus_recovery: float = Field(default=0.55, gt=0.0)
+    #: 치환이 같은 음운 부류(초성 조음방법 / 중성 활음형 / 종성 중화형) 안에서 일어났을 때의
+    #: 배수. 후보가 좁혀지므로 복구가 쉬워집니다.
+    same_class_bonus: float = Field(default=1.35, gt=0.0)
+    #: 오류가 늘어날수록 지각형이 목표에서 멀어집니다. 추가 오류마다 곱해집니다.
+    repair_per_extra_error_decay: float = Field(default=0.55, gt=0.0, le=1.0)
+    #: 긴 단어는 잉여 정보가 많아 복구가 쉽습니다 (V1 과 같은 방향).
+    repair_per_extra_syllable: float = Field(default=0.10, ge=0.0)
+
+    #: 어휘 항목이 지각형과 일치할 때의 복구 배수(어휘 함정). 이 어휘에서는 거의 발동하지
+    #: 않지만, 실제 한국어 어휘를 붙이면 의미를 갖도록 남겨 둡니다. 발동 빈도는 코호트
+    #: 요약에 기록되므로 "있으나 마나 한 항" 인지 확인할 수 있습니다.
+    lexical_trap_multiplier: float = Field(default=0.25, gt=0.0, le=1.0)
+
+    repair_floor: UnitInterval = 0.02
+    repair_ceiling: UnitInterval = 0.95
+
+
 class SimulationConfig(BaseModel):
     """A complete, reproducible synthetic-cohort specification."""
 
@@ -275,6 +350,10 @@ class SimulationConfig(BaseModel):
     confusion: ConfusionModel = Field(default_factory=ConfusionModel)
     trials: TrialModel = Field(default_factory=TrialModel)
     words: WordSourceModel = Field(default_factory=WordSourceModel)
+    #: 어느 생성 과정을 쓸 것인가. **기본값은 v1** 이므로 기존 설정과 기록된 실행의 의미론이
+    #: 바뀌지 않습니다. v2 는 복구를 지각형에 조건화합니다 (:class:`LexicalRepairV2`).
+    simulator_version: Literal["v1", "v2"] = "v1"
+    lexical_repair_v2: LexicalRepairV2 = Field(default_factory=LexicalRepairV2)
 
     @model_validator(mode="after")
     def _strata_are_known(self) -> SimulationConfig:

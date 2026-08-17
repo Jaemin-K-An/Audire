@@ -24,6 +24,7 @@ from audire.confusion.profile import CalibrationTrial, ConfusionProfile
 from audire.data.stimuli import StimulusCatalog, build_balanced_catalog
 from audire.profile.schema import HearingProfile
 from audire.sim.config import SimulationConfig
+from audire.sim.lexicon import build_lexicon
 from audire.sim.listener import SyntheticListener, generate_cohort
 from audire.sim.trials import (
     Vocabulary,
@@ -128,11 +129,31 @@ class Cohort:
             agg.setdefault(r.listener.stratum, []).append(r.listener.true_accuracy)
         return {k: float(sum(v) / len(v)) for k, v in sorted(agg.items())}
 
+    def lexical_trap_rate(self) -> float:
+        """오류가 난 시행 중 지각형이 어휘에 실재한 비율.
+
+        V2 의 어휘 함정 항이 실제로 발동하는지 보여줍니다. 이 어휘에서는 0 에 가까우며,
+        그 사실을 산출물에 남겨 두어야 "있으나 마나 한 항" 을 효과가 있는 것처럼 읽지
+        않습니다.
+        """
+        from audire.sim.lexicon import build_lexicon
+
+        lexicon = build_lexicon(self.vocabulary.words)
+        errored = [t for r in self.records for t in r.word_trials if t.n_segment_errors > 0]
+        if not errored:
+            return float("nan")
+        trapped = sum(1 for t in errored if t.perceived_word and lexicon.is_word(t.perceived_word))
+        return trapped / len(errored)
+
     def summary(self) -> dict[str, Any]:
         return {
             "config_name": self.config.name,
             "seed": self.seed,
             "is_synthetic": True,
+            # 어느 생성 과정이 이 결과를 만들었는가. V1 과 V2 는 결과 구조가 다르므로
+            # 버전 없이 기록된 수치는 해석할 수 없습니다.
+            "simulator_version": self.config.simulator_version,
+            "lexical_trap_rate": self.lexical_trap_rate(),
             "n_listeners": len(self.records),
             "n_calibration_trials_per_listener": self.config.n_calibration_trials,
             "n_word_trials_total": sum(len(r.word_trials) for r in self.records),
@@ -167,6 +188,10 @@ def build_cohort(
     catalog = calibration_catalog or build_balanced_catalog(cfg.n_calibration_trials)
     listeners = generate_cohort(cfg, seed)
     vocabulary = build_vocabulary(cfg, seed)
+    # 어휘 구조는 청취자와 무관하므로 코호트당 한 번만 만듭니다. V1 에서는 쓰이지 않지만
+    # 만드는 비용이 작고, 산출물에 어휘 규모를 남겨 두면 V1/V2 비교가 같은 어휘 위에서
+    # 이루어졌음을 확인할 수 있습니다.
+    lexicon = build_lexicon(vocabulary.words, vocabulary.provenance)
 
     records: list[ListenerRecord] = []
     for i, listener in enumerate(listeners):
@@ -194,7 +219,7 @@ def build_cohort(
                 listener=listener,
                 calibration=calibration,
                 estimated_confusion=estimated,
-                word_trials=simulate_word_trials(listener, vocabulary, word_rng, cfg),
+                word_trials=simulate_word_trials(listener, vocabulary, word_rng, cfg, lexicon),
             )
         )
 
@@ -209,5 +234,6 @@ def build_cohort(
             "config_name": cfg.name,
             "seed": seed,
             "is_synthetic": True,
+            "simulator_version": cfg.simulator_version,
         },
     )

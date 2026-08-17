@@ -1,0 +1,32 @@
+# AUDIRE E27 — Simulator v2 조건. 짝을 이루는 설정과 simulator_version 한 줄만 다릅니다.
+#
+# V1 은 복구 확률을 오류 개수와 음절 수만으로 정하므로 "각→닥" 과 "각→삭" 이 구분되지
+# 않습니다. 측정된 오라클 상한은 0.8307 이고 모델이 이미 그 95% 에 도달해 있습니다
+# (docs/RESULTS.md §14). V2 는 복구를 오류 **위치와 음운적 거리**에 조건화합니다.
+#
+# 두 설정의 시드·청취자 수·어휘·교정 길이가 모두 같으므로 차이는 생성 과정의 몫입니다.
+
+name: e27_simulator_v2
+description: >-
+  같은 추정기·같은 시드로 Simulator v2 를 평가합니다. 짝 실행과 비교해 더 풍부한 생성
+  과정이 회복 가능한 단어 수준 개인화 신호를 만드는지 봅니다.
+
+simulation:
+  name: e27_cohort_v2
+  seeds: [101, 202, 303, 404, 505]
+  n_listeners: 80
+  n_calibration_trials: 100
+  n_word_trials: 250
+  snr_conditions_db: [20.0]
+  speakers: [male, female]
+  simulator_version: v2
+
+models: [logistic, phoneme_independence]
+arm: clinical_plus_confusion_rich
+fallback_arm: clinical_plus_confusion
+calibrations: [none]
+n_splits: 5
+n_bootstrap: 0
+ece_bins: 10
+budgets: [0.10, 0.20, 0.30, 0.50]
+primary_budget: 0.20
