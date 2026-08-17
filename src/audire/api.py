@@ -198,10 +198,14 @@ def create_app(
     )
     application.state.services = services
 
-    from audire.live.routes import ALLOWED_ORIGIN_SCHEMES, ALLOWED_ORIGINS, build_live_router
+    from audire.live.routes import build_live_router
 
-    # CORS 를 좁힙니다. `*` 를 쓰면 같은 기기의 아무 페이지나 로컬 서버를 호출해 프로파일
-    # 목록을 읽을 수 있습니다. 확장 출처와 localhost 만 허용합니다.
+    # 앱 전체 CORS. `*` 를 쓰지 않습니다 — 그러면 사용자가 여는 아무 웹페이지나 로컬
+    # 서버를 호출할 수 있습니다. 여기에 `localhost` 가 있는 것은 **웹 앱 자신** 때문이며,
+    # 웹 앱은 라이브가 아닌 API 를 씁니다.
+    #
+    # 라이브 라우터는 이보다 좁게, 확장 출처만 받도록 스스로 판정합니다
+    # (`require_allowed_origin`). 여기의 `localhost` 허용이 거기까지 번지면 안 됩니다.
     application.add_middleware(
         CORSMiddleware,
         allow_origin_regex=(
@@ -213,7 +217,6 @@ def create_app(
         allow_headers=["content-type", "x-audire-token"],
     )
     application.include_router(build_live_router())
-    _ = (ALLOWED_ORIGIN_SCHEMES, ALLOWED_ORIGINS)
 
     web_root = repo_root() / "apps" / "web"
     if web_root.exists():

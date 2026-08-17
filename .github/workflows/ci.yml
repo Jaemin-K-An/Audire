@@ -27,6 +27,12 @@ jobs:
           python-version: "3.12"
           cache: pip
 
+      # The bridge test drives the extension's real JS client against a real
+      # socket, so this job needs Node as well as Python.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Install pinned dependencies
         run: |
           python -m pip install --upgrade pip
@@ -42,6 +48,12 @@ jobs:
 
       - name: Tests with branch coverage
         run: pytest --cov --cov-report=term-missing --cov-report=xml -m "not asr and not e2e and not data"
+
+      # Run by path, not by marker: the step above excludes `e2e`, and without
+      # this the extension/server contract would be checked by nobody. Both
+      # sides currently pass their own suites while only assuming the other.
+      - name: Extension client against a real server socket
+        run: pytest tests/integration/test_live_bridge.py -q
 
       - uses: actions/upload-artifact@v4
         if: always()

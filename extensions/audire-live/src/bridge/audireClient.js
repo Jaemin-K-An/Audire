@@ -22,6 +22,8 @@ export const LiveState = Object.freeze({
   PROFILE_NOT_READY: 'profile_not_ready',
   MODEL_UNAVAILABLE: 'model_unavailable',
   CONTRACT_MISMATCH: 'contract_mismatch',
+  /** 서버가 이 출처를 거절했습니다. 라이브 API 는 확장 출처만 받습니다. */
+  ORIGIN_NOT_ALLOWED: 'origin_not_allowed',
   INVALID_CUE: 'invalid_cue',
   UNKNOWN_ERROR: 'unknown_error',
 });
@@ -108,6 +110,16 @@ export class AudireClient {
       method: 'POST',
       body: JSON.stringify({ label }),
     });
+  }
+
+  /**
+   * 서버 쪽 페어링을 실제로 지웁니다.
+   *
+   * 확장에서 토큰만 잊는 것으로는 부족합니다. 서버는 그 토큰을 계속 유효하다고 여기고,
+   * 사용자는 "연결 해제" 를 눌렀으니 끊겼다고 믿습니다. 지워야 지워집니다.
+   */
+  unpair() {
+    return this._request('/api/live/pair', { method: 'DELETE' });
   }
 
   /**

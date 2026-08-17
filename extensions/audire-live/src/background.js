@@ -106,9 +106,20 @@ export function createRouter(deps) {
       }
 
       case MessageType.UNPAIR: {
+        // 서버 쪽 페어링을 먼저 지웁니다. 토큰을 잊는 것만으로는 서버가 그 토큰을 계속
+        // 유효하다고 여기고, 사용자는 끊겼다고 믿습니다.
+        const revoked = await (await client()).unpair();
+        // 서버가 꺼져 있어도 로컬 토큰은 지웁니다. 여기서 멈추면 "연결 해제" 가 서버
+        // 상태에 따라 되기도 하고 안 되기도 하는 버튼이 됩니다. 다만 서버에 남았을 수
+        // 있다는 사실은 숨기지 않습니다.
         await settings.clearToken();
         invalidateClient();
-        return { ok: true, state: LiveState.OK };
+        return {
+          ok: true,
+          state: LiveState.OK,
+          revokedOnServer: revoked.state === LiveState.OK,
+          serverState: revoked.state,
+        };
       }
 
       case MessageType.LIST_PROFILES: {

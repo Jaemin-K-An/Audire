@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from audire.config.logging import get_logger
@@ -34,16 +34,31 @@ from audire.live.service import (
 
 log = get_logger(__name__)
 
-#: 확장이 붙을 수 있는 출처. ``*`` 를 쓰지 않습니다 — 같은 기기의 아무 페이지나 로컬
-#: 서버를 호출할 수 있으면 프로파일 목록이 새어 나갑니다.
+#: 라이브 API 를 부를 수 있는 브라우저 출처. **확장뿐입니다.**
+#:
+#: 웹 페이지 출처를 넣으면 안 됩니다. ``POST /pair`` 는 토큰이 없는 상태에서 부르는
+#: 엔드포인트이므로, 같은 기기의 아무 페이지나 그것을 부를 수 있으면 그 페이지가 조용히
+#: 새 토큰을 받아 청취자 목록을 읽고 임의의 텍스트를 채점시킬 수 있습니다. 그 목록은
+#: 실존 인물의 건강 관련 메타데이터입니다.
+#:
+#: 앱 전체의 CORS 는 웹 앱 때문에 ``localhost`` 도 허용합니다. 라이브 라우터는 그보다
+#: 좁게, 스스로 판정합니다.
 ALLOWED_ORIGIN_SCHEMES = ("chrome-extension://", "moz-extension://")
-ALLOWED_ORIGINS = ("http://127.0.0.1", "http://localhost")
 
 
 def origin_is_allowed(origin: str | None) -> bool:
+    """이 출처가 라이브 API 를 부를 수 있는지.
+
+    ``Origin`` 이 없으면 허용합니다. 브라우저는 교차 출처 요청에 이 헤더를 **반드시**
+    붙이고 페이지가 지울 수 없으므로, 헤더가 없다는 것은 요청이 웹 페이지에서 오지
+    않았다는 뜻입니다(확장 워커, CLI, 시험).
+
+    같은 사용자로 도는 네이티브 프로세스는 무엇이든 위조할 수 있습니다. 이 판정은 그것을
+    막는다고 주장하지 않습니다 — 막는 것은 **브라우저 안의 다른 페이지**입니다.
+    """
     if not origin:
-        return True  # 확장 배경 스크립트는 Origin 을 붙이지 않을 수 있습니다.
-    return origin.startswith(ALLOWED_ORIGIN_SCHEMES) or origin.startswith(ALLOWED_ORIGINS)
+        return True
+    return origin.startswith(ALLOWED_ORIGIN_SCHEMES)
 
 
 class ScoreCueRequest(BaseModel):
@@ -65,8 +80,28 @@ class PairRequest(BaseModel):
     label: str = "browser-extension"
 
 
+def require_allowed_origin(origin: str | None = Header(default=None)) -> None:
+    """라우터 전체에 걸리는 출처 검사.
+
+    각 경로에서 따로 부르지 않고 라우터 의존성으로 답니다. 경로마다 부르면 **새로 추가한
+    경로가 검사를 빠뜨려도 아무도 모릅니다.** 실제로 이 함수는 Phase 5 에서 작성된 뒤
+    Phase 9 까지 어디에서도 호출되지 않은 채 남아 있었고, 그동안 라이브 API 는 로컬의
+    아무 페이지에나 열려 있었습니다.
+    """
+    if not origin_is_allowed(origin):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "reason": "origin_not_allowed",
+                "message": "라이브 API 는 AUDIRE 확장에서만 부를 수 있습니다.",
+            },
+        )
+
+
 def build_live_router() -> APIRouter:
-    router = APIRouter(prefix="/api/live", tags=["live"])
+    router = APIRouter(
+        prefix="/api/live", tags=["live"], dependencies=[Depends(require_allowed_origin)]
+    )
 
     def _services(request: Request) -> Any:
         return request.app.state.services
@@ -125,7 +160,14 @@ def build_live_router() -> APIRouter:
         return {"token": pairing.token, **pairing.public()}
 
     @router.delete("/pair")
-    async def unpair() -> dict[str, Any]:
+    async def unpair(x_audire_token: str | None = Header(default=None)) -> dict[str, Any]:
+        """페어링을 지웁니다. **현재 토큰을 제시해야 합니다.**
+
+        토큰 없이 지울 수 있으면 로컬의 아무 프로그램이나 사용자의 확장을 조용히 끊을 수
+        있습니다. 토큰을 잃어버린 경우에는 ``POST /pair`` 로 새로 만들면 되고, 그것이 옛
+        토큰을 무효로 만듭니다.
+        """
+        _require_pairing(x_audire_token)
         removed = revoke_pairing()
         log.info("live.unpaired", had_pairing=removed)
         return {"revoked": removed}

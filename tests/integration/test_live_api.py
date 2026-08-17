@@ -12,9 +12,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from audire.confusion import CalibrationTrial, ConfusionProfile
 from audire.live.service import MAX_CUE_CHARS, LiveScorer
-from audire.profile import ProfileStore
 from audire.profile.schema import (
     Audiogram,
     AudiogramPoint,
@@ -27,79 +25,6 @@ from audire.profile.schema import (
 
 LISTENER = "L001"
 SECRET_CUE = "비밀자막내용입니다"
-
-
-@pytest.fixture(autouse=True)
-def _private(tmp_path, monkeypatch):
-    monkeypatch.setenv("AUDIRE_PRIVATE_DIR", str(tmp_path / "private"))
-    yield
-
-
-@pytest.fixture
-def store(tmp_path) -> ProfileStore:
-    store = ProfileStore(tmp_path / "profiles")
-    ear = EarProfile(
-        ear=Ear.RIGHT,
-        audiogram=Audiogram(
-            ear=Ear.RIGHT,
-            thresholds={f: AudiogramPoint(db_hl=55.0) for f in (500, 1000, 2000, 4000)},
-        ),
-        speech=SpeechScores(
-            ear=Ear.RIGHT, srt_db_hl=55.0, wrs_percent=62.0, wrs_presentation_level_db_hl=85.0
-        ),
-    )
-    store.save_hearing(
-        HearingProfile(
-            listener_id=LISTENER, source=ProfileSource.MANUAL, is_synthetic=False, right=ear
-        )
-    )
-    store.save_confusion(
-        ConfusionProfile.from_trials(
-            LISTENER,
-            [
-                CalibrationTrial(stimulus_id=f"s{i}", target="각", response="각" if i % 3 else "닥")
-                for i in range(60)
-            ],
-            is_synthetic=False,
-        )
-    )
-    return store
-
-
-@pytest.fixture
-def live_scorer():
-    """작은 라이브 아티팩트를 실제로 적합해 계약 경로를 그대로 통과시킵니다."""
-    import yaml
-
-    from audire.config.paths import private_dir
-    from audire.risk.artifact import fit_live_artifact
-
-    config = private_dir() / "live.yaml"
-    config.parent.mkdir(parents=True, exist_ok=True)
-    config.write_text(
-        yaml.safe_dump(
-            {
-                "name": "live_api_test",
-                "simulation": {
-                    "name": "c",
-                    "seeds": [1],
-                    "n_listeners": 10,
-                    "n_calibration_trials": 20,
-                    "n_word_trials": 20,
-                },
-                "arms": ["live_word_context_clinical_confusion"],
-                "models": ["logistic"],
-                "n_splits": 3,
-                "n_bootstrap": 0,
-                "contrasts": [],
-            },
-            allow_unicode=True,
-        ),
-        encoding="utf-8",
-    )
-    artifact = fit_live_artifact(config)
-    metadata = {**artifact.metadata, "artifact_sha256": "test-digest"}
-    return LiveScorer(scorer=artifact.scorer, artifact_metadata=metadata)
 
 
 @pytest.fixture
@@ -140,7 +65,56 @@ def test_an_invalid_token_is_rejected(client, token):
 
 def test_revoking_the_pairing_blocks_further_requests(client, token):
     assert client.get("/api/live/profiles", headers={"X-Audire-Token": token}).status_code == 200
-    client.delete("/api/live/pair")
+    client.delete("/api/live/pair", headers={"X-Audire-Token": token})
+    assert client.get("/api/live/profiles", headers={"X-Audire-Token": token}).status_code == 401
+
+
+def test_re_pairing_invalidates_the_previous_token(client, token):
+    """토큰을 잃어버렸을 때의 탈출구. 새로 만들면 옛것이 무효가 됩니다."""
+    fresh = client.post("/api/live/pair", json={}).json()["token"]
+    assert fresh != token
+    assert client.get("/api/live/profiles", headers={"X-Audire-Token": token}).status_code == 401
+    assert client.get("/api/live/profiles", headers={"X-Audire-Token": fresh}).status_code == 200
+
+
+def test_a_web_page_origin_cannot_reach_the_live_api(client):
+    """웹 페이지 출처는 라이브 API 에 닿을 수 없습니다.
+
+    이것이 페어링을 지탱하는 전제입니다. `POST /pair` 는 토큰이 없는 상태에서 부르는
+    엔드포인트이므로, 같은 기기의 아무 페이지나 이것을 부를 수 있으면 그 페이지가 조용히
+    새 토큰을 받아 청취자 목록을 읽고 임의의 텍스트를 채점시킬 수 있습니다. 그 목록은
+    실존 인물의 건강 관련 메타데이터입니다.
+
+    `Origin` 은 브라우저가 붙이고 페이지가 바꿀 수 없는 헤더입니다. 그래서 브라우저 안의
+    공격자에게는 실제 경계가 됩니다. 같은 사용자로 도는 네이티브 프로세스는 무엇이든
+    위조할 수 있고, 그것은 이 설계가 막는다고 주장하지 않는 범위입니다.
+    """
+    page = {"Origin": "http://localhost:5173"}
+    assert client.post("/api/live/pair", json={}, headers=page).status_code == 403
+    assert client.get("/api/live/status", headers=page).status_code == 403
+    assert client.get("/api/live/profiles", headers=page).status_code == 403
+    assert client.delete("/api/live/pair", headers=page).status_code == 403
+
+
+def test_the_extension_origin_is_accepted(client):
+    extension = {"Origin": "chrome-extension://abcdefghijklmnopabcdefghijklmnop"}
+    assert client.get("/api/live/status", headers=extension).status_code == 200
+    assert client.post("/api/live/pair", json={}, headers=extension).status_code == 201
+
+
+def test_a_refused_origin_is_told_why(client):
+    body = client.get("/api/live/status", headers={"Origin": "http://localhost:5173"}).json()
+    assert body["detail"]["reason"] == "origin_not_allowed"
+
+
+def test_revoking_requires_the_token(client, token):
+    """토큰 없이 페어링을 지울 수 있으면 아무나 확장을 끊을 수 있습니다."""
+    assert client.delete("/api/live/pair").status_code == 401
+    assert client.get("/api/live/profiles", headers={"X-Audire-Token": token}).status_code == 200
+
+    revoked = client.delete("/api/live/pair", headers={"X-Audire-Token": token})
+    assert revoked.status_code == 200
+    assert revoked.json()["revoked"] is True
     assert client.get("/api/live/profiles", headers={"X-Audire-Token": token}).status_code == 401
 
 

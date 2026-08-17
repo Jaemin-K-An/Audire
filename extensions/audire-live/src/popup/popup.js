@@ -23,6 +23,8 @@ const STATE_TEXT = {
   [LiveState.MODEL_UNAVAILABLE]: '라이브 모델 아티팩트가 없습니다. `make live-model` 이 필요합니다.',
   [LiveState.CONTRACT_MISMATCH]: '모델과 실행 환경의 특징 계약이 다릅니다. 아티팩트를 다시 만드십시오.',
   [LiveState.INVALID_CUE]: '자막을 채점할 수 없는 형태입니다.',
+  [LiveState.ORIGIN_NOT_ALLOWED]:
+    '서버가 이 출처를 거절했습니다. 라이브 API 는 AUDIRE 확장에서만 부를 수 있습니다.',
   [DISABLED]: '꺼져 있습니다.',
 };
 
@@ -119,8 +121,18 @@ function wire() {
   });
 
   $('unpair').addEventListener('click', async () => {
-    await send({ type: MessageType.UNPAIR });
+    const result = await send({ type: MessageType.UNPAIR });
     await refresh();
+    if (!result.revokedOnServer) {
+      // 로컬 토큰은 지워졌지만 서버에는 페어링이 남아 있을 수 있습니다. 끊겼다고
+      // 잘못 믿게 두지 않습니다.
+      setText(
+        'pairing-state',
+        `이 브라우저의 토큰은 지웠습니다. 다만 서버에 닿지 못해(${describe(
+          result.serverState,
+        )}) 서버 쪽 페어링은 남아 있을 수 있습니다. 서버를 켠 뒤 다시 눌러 주십시오.`,
+      );
+    }
   });
 
   $('profile-select').addEventListener('change', (event) => {

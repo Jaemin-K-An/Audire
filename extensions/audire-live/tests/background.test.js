@@ -59,6 +59,10 @@ function stubClient(responses = {}) {
             }
           );
         },
+        async unpair() {
+          seen.push({ ...record, call: 'unpair' });
+          return responses.unpair ?? { state: LiveState.OK, body: { revoked: true } };
+        },
         async scoreCue(cue) {
           seen.push({ ...record, call: 'score-cue', cue });
           return responses.scoreCue ?? { state: LiveState.OK, body: { words: [] }, stale: false };
@@ -127,6 +131,31 @@ test('연결 해제 후에는 토큰 없이 요청한다', async () => {
 
   assert.ok(!('audire.token' in area.data));
   assert.equal(client.seen.at(-1).token, null);
+});
+
+test('연결 해제가 서버의 페어링도 지운다', async () => {
+  // 토큰만 잊으면 서버는 그 토큰을 계속 유효하다고 여기고, 사용자는 끊겼다고 믿습니다.
+  const { client, router } = build(undefined, { 'audire.token': 'old-token' });
+  const result = await router({ type: MessageType.UNPAIR });
+
+  const call = client.seen.find((c) => c.call === 'unpair');
+  assert.ok(call, 'unpair must reach the server');
+  assert.equal(call.token, 'old-token', '서버는 현재 토큰을 요구합니다');
+  assert.equal(result.revokedOnServer, true);
+});
+
+test('서버가 꺼져 있어도 로컬 토큰은 지워진다', async () => {
+  // 여기서 멈추면 "연결 해제" 가 서버 상태에 따라 되기도 하고 안 되기도 하는 버튼이
+  // 됩니다. 다만 서버에 남았을 수 있다는 사실은 응답이 숨기지 않습니다.
+  const { area, router } = build(
+    { unpair: { state: LiveState.SERVER_OFFLINE } },
+    { 'audire.token': 'old-token' },
+  );
+  const result = await router({ type: MessageType.UNPAIR });
+
+  assert.ok(!('audire.token' in area.data));
+  assert.equal(result.revokedOnServer, false);
+  assert.equal(result.serverState, LiveState.SERVER_OFFLINE);
 });
 
 test('꺼져 있으면 자막이 서버로 나가지 않는다', async () => {

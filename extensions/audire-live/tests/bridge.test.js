@@ -186,3 +186,16 @@ test('목표 자막률은 지정했을 때만 보낸다', async () => {
   });
   assert.equal(JSON.parse(fetchImpl.calls[1].init.body).target_caption_rate, 0.35);
 });
+
+test('출처 거절이 고유한 상태로 도착한다', async () => {
+  // 이 사유가 어휘에 없으면 "알 수 없는 오류" 가 되고, 사용자는 무엇을 고쳐야 할지
+  // 알 수 없습니다. 서버는 이 응답을 403 으로 냅니다.
+  const fetchImpl = stubFetch(() =>
+    jsonResponse(
+      { detail: { reason: 'origin_not_allowed', message: '…' } },
+      { ok: false, status: 403 },
+    ),
+  );
+  const result = await new AudireClient({ fetchImpl }).status();
+  assert.equal(result.state, LiveState.ORIGIN_NOT_ALLOWED);
+});
